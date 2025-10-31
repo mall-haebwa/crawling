@@ -30,26 +30,31 @@ async def collect_products(
     - **force**: 중복 수집 강제 실행 (기본값: false)
     """
     try:
-        # 중복 수집 방지: 최근 24시간 이내에 같은 키워드로 수집했는지 확인
+        # 중복 수집 방지: 이미 수집한 키워드인지 확인
         if not force:
-            from datetime import timedelta
-            recent_time = datetime.utcnow() - timedelta(hours=24)
-
-            recent_collection = await ProductSearchResponse.find_one(
-                ProductSearchResponse.search_keyword == query,
-                ProductSearchResponse.collected_at >= recent_time
+            existing_collection = await ProductSearchResponse.find_one(
+                ProductSearchResponse.search_keyword == query
             )
 
-            if recent_collection:
-                time_diff = datetime.utcnow() - recent_collection.collected_at
-                hours = int(time_diff.total_seconds() / 3600)
+            if existing_collection:
+                time_diff = datetime.utcnow() - existing_collection.collected_at
+                days = time_diff.days
+                hours = int((time_diff.total_seconds() % 86400) / 3600)
                 minutes = int((time_diff.total_seconds() % 3600) / 60)
+
+                # 경과 시간 메시지 구성
+                if days > 0:
+                    time_message = f"{days}일 {hours}시간"
+                elif hours > 0:
+                    time_message = f"{hours}시간 {minutes}분"
+                else:
+                    time_message = f"{minutes}분"
 
                 return {
                     "status": "skipped",
                     "query": query,
-                    "message": f"'{query}' 키워드는 {hours}시간 {minutes}분 전에 이미 수집되었습니다.",
-                    "last_collected": recent_collection.collected_at.isoformat(),
+                    "message": f"'{query}' 키워드는 {time_message} 전에 이미 수집되었습니다.",
+                    "last_collected": existing_collection.collected_at.isoformat(),
                     "total_collected": 0,
                     "new_products": 0,
                     "updated_products": 0,
