@@ -365,7 +365,7 @@
                 <input type="number" id="search-min-price" placeholder="최소 가격">
                 <input type="number" id="search-max-price" placeholder="최대 가격">
                 <button type="submit">검색</button>
-                <button type="button" onclick="loadProducts()">전체 보기</button>
+                <button type="button" onclick="resetSearch()">전체 보기</button>
             </form>
         </div>
 
@@ -389,6 +389,7 @@
     <script>
         let currentPage = 1;
         const pageSize = 12;
+        let currentSearchParams = null; // 현재 검색 조건 저장
 
         // 초기 로드
         window.onload = function() {
@@ -472,6 +473,17 @@
             }
         }
 
+        // 검색 초기화 (전체 보기)
+        function resetSearch() {
+            currentSearchParams = null;
+            currentPage = 1;
+            document.getElementById('search-keyword').value = '';
+            document.getElementById('search-min-price').value = '';
+            document.getElementById('search-max-price').value = '';
+            document.getElementById('search-result-count').textContent = '';
+            loadProducts();
+        }
+
         // 상품 검색
         async function searchProducts(event) {
             event.preventDefault();
@@ -481,15 +493,35 @@
             const minPrice = document.getElementById('search-min-price').value;
             const maxPrice = document.getElementById('search-max-price').value;
 
-            let url = `/products/search?limit=${pageSize}`;
-            if (keyword) url += `&keyword=${encodeURIComponent(keyword)}`;
-            if (minPrice) url += `&min_price=${minPrice}`;
-            if (maxPrice) url += `&max_price=${maxPrice}`;
+            // 검색 조건 저장
+            currentSearchParams = {
+                keyword: keyword,
+                minPrice: minPrice,
+                maxPrice: maxPrice
+            };
+
+            await loadSearchResults();
+        }
+
+        // 검색 결과 로드 (페이지네이션 지원)
+        async function loadSearchResults() {
+            const skip = (currentPage - 1) * pageSize;
+            let url = `/products/search?limit=${pageSize}&skip=${skip}`;
+
+            if (currentSearchParams.keyword) url += `&keyword=${encodeURIComponent(currentSearchParams.keyword)}`;
+            if (currentSearchParams.minPrice) url += `&min_price=${currentSearchParams.minPrice}`;
+            if (currentSearchParams.maxPrice) url += `&max_price=${currentSearchParams.maxPrice}`;
 
             try {
                 const response = await fetch(url);
-                const products = await response.json();
-                displayProducts(products, true);
+                const data = await response.json();
+
+                // 새로운 응답 형식 처리
+                const products = data.products || data;
+                const total = data.total || products.length;
+
+                displayProducts(products, true, total);
+                updatePagination();
             } catch (error) {
                 document.getElementById('products-grid').innerHTML =
                     '<div class="error">검색에 실패했습니다.</div>';
@@ -543,12 +575,14 @@
         }
 
         // 상품 표시
-        function displayProducts(products, isSearchResult = false) {
+        function displayProducts(products, isSearchResult = false, totalCount = null) {
             const grid = document.getElementById('products-grid');
             const countDiv = document.getElementById('search-result-count');
 
             // 검색 결과 개수 표시
-            if (isSearchResult) {
+            if (isSearchResult && totalCount !== null) {
+                countDiv.textContent = `검색 결과: 총 ${totalCount.toLocaleString()}개`;
+            } else if (isSearchResult) {
                 countDiv.textContent = `검색 결과: ${products.length}개`;
             } else {
                 countDiv.textContent = '';
@@ -589,13 +623,23 @@
         function previousPage() {
             if (currentPage > 1) {
                 currentPage--;
-                loadProducts();
+                // 검색 중이면 검색 결과 로드, 아니면 전체 목록 로드
+                if (currentSearchParams) {
+                    loadSearchResults();
+                } else {
+                    loadProducts();
+                }
             }
         }
 
         function nextPage() {
             currentPage++;
-            loadProducts();
+            // 검색 중이면 검색 결과 로드, 아니면 전체 목록 로드
+            if (currentSearchParams) {
+                loadSearchResults();
+            } else {
+                loadProducts();
+            }
         }
     </script>
 </body>

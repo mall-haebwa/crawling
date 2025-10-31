@@ -125,7 +125,7 @@ async def collect_products(
         raise HTTPException(status_code=500, detail=f"상품 수집 중 오류가 발생했습니다: {str(e)}")
 
 
-@router.get("/search", response_model=List[Product])
+@router.get("/search", response_model=dict)
 async def search_products(
     keyword: Optional[str] = Query(None, description="검색 키워드 (제목, 브랜드, 제조사)"),
     category1: Optional[str] = Query(None, description="카테고리 1단계"),
@@ -178,11 +178,20 @@ async def search_products(
         # 최종 쿼리 구성
         if query_conditions:
             final_query = {"$and": query_conditions}
+            # 총 개수 계산
+            total_count = await Product.find(final_query).count()
             products = await Product.find(final_query).skip(skip).limit(limit).to_list()
         else:
+            total_count = await Product.count()
             products = await Product.find_all().skip(skip).limit(limit).to_list()
 
-        return products
+        return {
+            "total": total_count,
+            "count": len(products),
+            "skip": skip,
+            "limit": limit,
+            "products": products
+        }
 
     except Exception as e:
         logger.error(f"Error searching products: {str(e)}")

@@ -1,10 +1,12 @@
+import re
 import httpx
+import logging
 from typing import List, Dict, Any, Optional
+from datetime import datetime
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from app.config import settings
 from app.models import Product
-from datetime import datetime
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -198,7 +200,6 @@ class NaverShoppingAPI:
     @staticmethod
     def _strip_html_tags(text: str) -> str:
         """HTML 태그 제거"""
-        import re
         clean = re.compile('<.*?>')
         return re.sub(clean, '', text)
 

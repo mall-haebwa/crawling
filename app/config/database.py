@@ -1,8 +1,10 @@
-from motor.motor_asyncio import AsyncIOMotorClient
+import logging
+from typing import Optional
+from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from beanie import init_beanie
+
 from app.config import settings
 from app.models import Product, ProductSearchResponse
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -10,11 +12,11 @@ logger = logging.getLogger(__name__)
 class Database:
     """MongoDB 데이터베이스 연결 관리"""
 
-    client: AsyncIOMotorClient = None
-    database = None
+    client: Optional[AsyncIOMotorClient] = None
+    database: Optional[AsyncIOMotorDatabase] = None
 
     @classmethod
-    async def connect_db(cls):
+    async def connect_db(cls) -> None:
         """데이터베이스 연결 초기화"""
         try:
             cls.client = AsyncIOMotorClient(settings.MONGODB_URL)
@@ -33,7 +35,7 @@ class Database:
             raise
 
     @classmethod
-    async def close_db(cls):
+    async def close_db(cls) -> None:
         """데이터베이스 연결 종료"""
         if cls.client:
             cls.client.close()
