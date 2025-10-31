@@ -411,13 +411,25 @@
                 const data = await response.json();
 
                 if (response.ok) {
-                    messageDiv.innerHTML = `
-                        <div class="success">
-                            ✓ 수집 완료: ${data.total_collected}개 상품 (신규: ${data.new_products}, 업데이트: ${data.updated_products})
-                        </div>
-                    `;
-                    loadStats();
-                    loadProducts();
+                    if (data.status === 'skipped') {
+                        // 중복 수집 방지 메시지
+                        messageDiv.innerHTML = `
+                            <div class="loading" style="background: #fef3c7; color: #92400e;">
+                                ⚠ ${data.message}<br>
+                                <small style="font-size: 0.9em;">마지막 수집: ${new Date(data.last_collected).toLocaleString('ko-KR')}</small><br>
+                                <small style="font-size: 0.9em; opacity: 0.8;">${data.hint}</small>
+                            </div>
+                        `;
+                    } else {
+                        // 수집 완료 메시지
+                        messageDiv.innerHTML = `
+                            <div class="success">
+                                ✓ 수집 완료: ${data.total_collected}개 상품 (신규: ${data.new_products}, 업데이트: ${data.updated_products})
+                            </div>
+                        `;
+                        loadStats();
+                        loadProducts();
+                    }
                 } else {
                     messageDiv.innerHTML = `<div class="error">수집 실패: ${data.detail}</div>`;
                 }

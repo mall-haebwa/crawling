@@ -102,7 +102,13 @@ class ProductSearchResponse(Document):
     total_count: int = Field(..., description="전체 검색 결과 수")
     display: int = Field(..., description="한 번에 표시되는 결과 수")
     start: int = Field(..., description="검색 시작 위치")
+    sort: str = Field(default="sim", description="정렬 옵션")
     collected_at: datetime = Field(default_factory=datetime.utcnow, description="수집 시각")
 
     class Settings:
         name = "search_history"
+        indexes = [
+            "search_keyword",
+            "collected_at",
+            [("search_keyword", 1), ("collected_at", -1)],  # 복합 인덱스
+        ]
