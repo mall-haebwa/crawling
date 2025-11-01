@@ -1,12 +1,31 @@
 # Naver Shopping API Collector
 
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/your-repo/releases)
+[![Python](https://img.shields.io/badge/python-3.11+-green.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.120.4-009688.svg)](https://fastapi.tiangolo.com/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-4.4+-47A248.svg)](https://www.mongodb.com/)
+
 네이버 쇼핑 Open API를 활용한 상품 데이터 수집 및 관리 시스템입니다.
 FastAPI + MongoDB 기반으로 구축되었으며, 자연어 기반 검색을 지원합니다.
+
+## 📢 최신 업데이트 (v1.2.0)
+
+**2025-11-01 릴리스**
+
+- ✅ **핵심 버그 수정**: 배치 수집 쿼리 필터 오류 해결
+- ⚡ **성능 50% 향상**: 데이터베이스 쿼리 병렬화
+- 🛡️ **안정성 강화**: MongoDB 연결 재시도 및 타임아웃 개선
+- 🐛 **메모리 누수 방지**: WebSocket 연결 자동 정리
+- 📊 **벌크 처리 최적화**: 메모리 효율 30% 개선
+
+자세한 내용은 [CHANGELOG.md](CHANGELOG.md)를 참고하세요.
 
 ## 주요 기능
 
 ### 데이터 수집
 - 네이버 쇼핑 API를 통한 상품 데이터 수집 (키워드당 최대 1,000개)
+- **CSV 일괄 수집**: 여러 키워드를 한 번에 자동 수집 (v1.1.0+)
+- **실시간 진행 모니터링**: WebSocket 기반 진행 상황 확인 (v1.1.0+)
 - 중복 수집 방지 (키워드 기반 영구 방지, force 옵션으로 재수집 가능)
 - 수집 이력 관리 및 조회
 
@@ -286,6 +305,103 @@ curl -X GET "http://localhost:8000/products/stats/summary"
 **Request:**
 ```bash
 curl -X DELETE "http://localhost:8000/products/12345678"
+```
+
+---
+
+## 일괄 수집 API (v1.1.0+)
+
+### CSV 업로드 및 배치 수집
+
+#### POST /batch/upload
+CSV 파일을 업로드하여 여러 키워드를 자동으로 순차 수집
+
+**CSV 파일 형식:**
+```csv
+keyword
+갤럭시 버즈
+아이폰 15
+맥북 프로
+```
+
+**Request:**
+```bash
+curl -X POST "http://localhost:8000/batch/upload" \
+  -F "file=@keywords.csv" \
+  -F "rate_limit_seconds=60"
+```
+
+**Parameters:**
+- `file` (required): CSV 파일 (첫 번째 열에 키워드)
+- `rate_limit_seconds` (optional, default=60): 키워드 간 대기 시간 (5-300초)
+
+**Response:**
+```json
+{
+  "batch_id": "uuid",
+  "total_keywords": 10,
+  "status": "pending",
+  "message": "배치 수집이 시작되었습니다. /batch/{batch_id}/status 에서 진행 상황을 확인하세요."
+}
+```
+
+### 배치 상태 조회
+
+#### GET /batch/{batch_id}/status
+배치 수집 진행 상황 조회
+
+**Request:**
+```bash
+curl -X GET "http://localhost:8000/batch/{batch_id}/status"
+```
+
+**Response:**
+```json
+{
+  "batch_id": "uuid",
+  "status": "running",
+  "progress": {
+    "total": 10,
+    "completed": 3,
+    "failed": 0,
+    "skipped": 1,
+    "current_index": 3,
+    "percentage": 30
+  },
+  "current_keyword": {
+    "keyword": "갤럭시 버즈",
+    "status": "running"
+  },
+  "stats": {
+    "total_products": 3000,
+    "new_products": 2500,
+    "updated_products": 500
+  }
+}
+```
+
+### 배치 제어
+
+#### POST /batch/{batch_id}/pause
+배치 수집 일시정지
+
+#### POST /batch/{batch_id}/resume
+일시정지된 배치 재개
+
+#### POST /batch/{batch_id}/cancel
+배치 수집 취소
+
+### WebSocket 실시간 모니터링
+
+#### WS /ws/batch/{batch_id}
+배치 진행 상황을 WebSocket으로 실시간 수신
+
+```javascript
+const ws = new WebSocket('ws://localhost:8000/ws/batch/{batch_id}');
+ws.onmessage = (event) => {
+  const status = JSON.parse(event.data);
+  console.log('Progress:', status.progress.percentage + '%');
+};
 ```
 
 ## 프로젝트 구조

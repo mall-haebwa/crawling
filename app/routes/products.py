@@ -18,6 +18,8 @@ from app.models import Product, ProductSearchResponse
 from app.services import naver_api
 from datetime import datetime
 import logging
+import re
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -126,25 +128,52 @@ async def collect_products(
         if not products:
             raise HTTPException(status_code=404, detail="검색 결과가 없습니다.")
 
-        # MongoDB에 저장
+        # MongoDB에 저장 (N+1 쿼리 최적화: 벌크 작업)
         saved_count = 0
         updated_count = 0
 
-        for product in products:
-            # 기존 상품 확인 (product_id 기준)
-            existing = await Product.find_one(Product.product_id == product.product_id)
+        # 1. 모든 product_id를 한 번에 조회 (1 쿼리)
+        product_ids = [p.product_id for p in products]
+        existing_products = await Product.find(
+            {"product_id": {"$in": product_ids}}
+        ).to_list()
 
-            if existing:
-                # 업데이트
+        # 2. 기존 상품을 딕셔너리로 매핑 (O(1) 조회)
+        existing_map = {p.product_id: p for p in existing_products}
+
+        # 3. 신규/업데이트 분류
+        products_to_insert = []
+        products_to_update = []
+
+        for product in products:
+            if product.product_id in existing_map:
+                # 업데이트 대상
+                existing = existing_map[product.product_id]
                 existing.lprice = product.lprice
                 existing.hprice = product.hprice
                 existing.updated_at = datetime.utcnow()
-                await existing.save()
+                products_to_update.append(existing)
                 updated_count += 1
             else:
-                # 신규 저장
-                await product.insert()
+                # 신규 삽입 대상
+                products_to_insert.append(product)
                 saved_count += 1
+
+        # 4. 벌크 작업 실행 (병렬 처리로 성능 최적화)
+        tasks = []
+        if products_to_insert:
+            tasks.append(Product.insert_many(products_to_insert))
+
+        if products_to_update:
+            # 업데이트는 배치 크기로 나눠서 처리 (너무 많은 동시 작업 방지)
+            batch_size = 50
+            for i in range(0, len(products_to_update), batch_size):
+                batch = products_to_update[i:i + batch_size]
+                tasks.append(asyncio.gather(*[p.save() for p in batch]))
+
+        # 모든 작업 병렬 실행
+        if tasks:
+            await asyncio.gather(*tasks)
 
         # 검색 이력 저장
         search_history = ProductSearchResponse(
@@ -217,17 +246,21 @@ async def search_products(
             query_conditions.append({"category1": category1})
 
         if mall_name:
-            query_conditions.append({"mallName": {"$regex": mall_name, "$options": "i"}})
+            # NoSQL Injection 방지: 정규식 특수문자 이스케이프
+            escaped_mall = re.escape(mall_name)
+            query_conditions.append({"mallName": {"$regex": escaped_mall, "$options": "i"}})
 
         if keyword:
             # 텍스트 검색 (제목, 브랜드, 제조사)
             # MongoDB 텍스트 인덱스 우선 사용, 실패 시 regex 사용
             # text 인덱스: [("title", "text"), ("brand", "text"), ("maker", "text")]
+            # NoSQL Injection 방지: 정규식 특수문자 이스케이프
+            escaped_keyword = re.escape(keyword)
             query_conditions.append({
                 "$or": [
-                    {"title": {"$regex": keyword, "$options": "i"}},
-                    {"brand": {"$regex": keyword, "$options": "i"}},
-                    {"maker": {"$regex": keyword, "$options": "i"}},
+                    {"title": {"$regex": escaped_keyword, "$options": "i"}},
+                    {"brand": {"$regex": escaped_keyword, "$options": "i"}},
+                    {"maker": {"$regex": escaped_keyword, "$options": "i"}},
                     {"tags": keyword}  # 배열 검색 최적화
                 ]
             })
@@ -243,13 +276,17 @@ async def search_products(
         # 최종 쿼리 구성
         if query_conditions:
             final_query = {"$and": query_conditions} if len(query_conditions) > 1 else query_conditions[0]
-            # 쿼리 재사용을 위한 find 객체 생성
-            query_obj = Product.find(final_query)
-            total_count = await query_obj.count()
-            products = await Product.find(final_query).skip(skip).limit(limit).to_list()
+            # 병렬로 count와 데이터 조회 (성능 최적화)
+            total_count, products = await asyncio.gather(
+                Product.find(final_query).count(),
+                Product.find(final_query).skip(skip).limit(limit).to_list()
+            )
         else:
-            total_count = await Product.count()
-            products = await Product.find_all().skip(skip).limit(limit).to_list()
+            # 병렬로 count와 데이터 조회 (성능 최적화)
+            total_count, products = await asyncio.gather(
+                Product.count(),
+                Product.find_all().skip(skip).limit(limit).to_list()
+            )
 
         return {
             "total": total_count,

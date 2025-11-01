@@ -155,7 +155,7 @@ app = FastAPI(
     - httpx (HTTP 클라이언트)
     - Jinja2 (템플릿 엔진)
     """,
-    version="1.1.0",
+    version="1.2.0",
     lifespan=lifespan,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
@@ -177,6 +177,10 @@ templates = Jinja2Templates(directory="templates")
 # 라우터 등록
 app.include_router(products_router)  # 상품 관련 API
 app.include_router(batch_router)  # 일괄 수집 API
+
+# WebSocket 라우터
+from app.routes.websocket import router as websocket_router
+app.include_router(websocket_router)  # WebSocket API
 
 
 @app.get("/", response_class=HTMLResponse, tags=["web"])
@@ -215,7 +219,7 @@ async def api_root():
     """
     return {
         "message": "Naver Shopping API Collector",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "docs": "/api/docs",
         "redoc": "/api/redoc",
         "web_ui": "/",

@@ -116,11 +116,16 @@ async def upload_csv_batch(
 
         logger.info(f"배치 생성 완료: {batch.batch_id}")
 
-        # 백그라운드에서 수집 시작
-        background_tasks.add_task(
-            batch_service.start_batch_collection,
-            batch.batch_id
-        )
+        # 백그라운드에서 수집 시작 (안전한 래퍼 함수 사용)
+        async def safe_batch_collection(batch_id: str):
+            """백그라운드 배치 수집 안전 래퍼"""
+            try:
+                await batch_service.start_batch_collection(batch_id)
+            except Exception as e:
+                logger.error(f"백그라운드 배치 실패: {batch_id}, {e}", exc_info=True)
+                # 실패 상태는 start_batch_collection 내부에서 처리됨
+
+        background_tasks.add_task(safe_batch_collection, batch.batch_id)
 
         return {
             "batch_id": batch.batch_id,
@@ -381,11 +386,16 @@ async def resume_batch(batch_id: str, background_tasks: BackgroundTasks):
                 detail=f"일시정지된 배치만 재개할 수 있습니다. 현재 상태: {batch.status}"
             )
 
-        # 백그라운드에서 재개
-        background_tasks.add_task(
-            batch_service.start_batch_collection,
-            batch_id
-        )
+        # 백그라운드에서 재개 (안전한 래퍼 함수 사용)
+        async def safe_batch_resume(batch_id: str):
+            """백그라운드 배치 재개 안전 래퍼"""
+            try:
+                await batch_service.start_batch_collection(batch_id)
+            except Exception as e:
+                logger.error(f"백그라운드 배치 재개 실패: {batch_id}, {e}", exc_info=True)
+                # 실패 상태는 start_batch_collection 내부에서 처리됨
+
+        background_tasks.add_task(safe_batch_resume, batch_id)
 
         logger.info(f"배치 재개: {batch_id}")
 

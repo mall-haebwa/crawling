@@ -63,6 +63,9 @@ class Database:
                 serverSelectionTimeoutMS=settings.MONGODB_SERVER_SELECTION_TIMEOUT_MS,
                 maxPoolSize=settings.MONGODB_MAX_POOL_SIZE,
                 minPoolSize=settings.MONGODB_MIN_POOL_SIZE,
+                retryWrites=True,  # 쓰기 재시도 활성화 (안정성 향상)
+                retryReads=True,   # 읽기 재시도 활성화 (안정성 향상)
+                w="majority",      # 쓰기 승인 수준 (과반수 확인)
             )
 
             # 데이터베이스 선택
