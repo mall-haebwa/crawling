@@ -29,9 +29,32 @@ FastAPI + MongoDB 기반으로 구축되었으며, 자연어 기반 검색을 �
 
 ## 시스템 요구사항
 
-- Python 3.8+
+- Python 3.11+ (권장: 3.12.3)
+  - Python 3.11, 3.12, 3.13 완전 지원
+  - Python 3.14 실험적 지원
 - MongoDB 4.4+
 - Naver Open API 키 (Client ID, Client Secret)
+
+## 프로젝트 구조
+
+```
+crawling/
+├── app/                        # 애플리케이션 소스 코드
+│   ├── config/                 # 설정 파일 (database, settings)
+│   ├── models/                 # 데이터 모델 (Product, SearchResponse)
+│   ├── routes/                 # API 라우터 (products)
+│   └── services/               # 비즈니스 로직 (naver_api)
+├── static/                     # 정적 파일 (CSS, JS)
+├── templates/                  # HTML 템플릿
+├── docs/                       # 문서
+│   ├── PYTHON_313_COMPATIBILITY.md  # Python 3.13/3.14 호환성 분석
+│   ├── SECURITY.md             # 보안 가이드라인
+│   └── backups/                # 의존성 백업 파일
+├── main.py                     # 애플리케이션 진입점
+├── requirements.txt            # 의존성 목록
+├── .env.example                # 환경 변수 템플릿
+└── README.md                   # 프로젝트 문서 (현재 파일)
+```
 
 ## 설치 방법
 
@@ -573,6 +596,18 @@ pip install -r requirements.txt
 ## 라이선스
 
 MIT License
+
+## 주요 의존성 버전
+
+- **FastAPI** 0.120.4 (Python 3.14 지원)
+- **Pydantic** 2.12.3 (Python 3.13/3.14 지원)
+- **Beanie** 2.0.0 (MongoDB ODM)
+- **Motor** 3.7.1 (Async MongoDB Driver)
+- **PyMongo** 4.15.3
+- **httpx** 0.28.1
+- **Uvicorn** 0.38.0
+
+자세한 내용은 [PYTHON_313_COMPATIBILITY.md](./docs/PYTHON_313_COMPATIBILITY.md)를 참고하세요.
 
 ## 참고 자료
 

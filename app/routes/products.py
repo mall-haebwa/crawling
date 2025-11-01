@@ -169,7 +169,7 @@ async def collect_products(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error collecting products: {str(e)}")
+        logger.error(f"상품 수집 오류 (query={query}): {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"상품 수집 중 오류가 발생했습니다: {str(e)}")
 
 
@@ -186,34 +186,46 @@ async def search_products(
     """
     MongoDB에 저장된 상품 검색
 
+    인덱스를 활용한 최적화된 검색을 제공합니다.
+
+    ## 파라미터
     - **keyword**: 제목, 브랜드, 제조사에서 검색
-    - **category1**: 카테고리 필터
-    - **mall_name**: 쇼핑몰 필터
+    - **category1**: 카테고리 필터 (인덱스 활용)
+    - **mall_name**: 쇼핑몰 필터 (인덱스 활용)
     - **min_price**: 최소 가격
     - **max_price**: 최대 가격
     - **limit**: 조회할 최대 결과 수
     - **skip**: 건너뛸 결과 수 (페이지네이션용)
+
+    ## 응답
+    - total: 전체 결과 수
+    - count: 현재 페이지 결과 수
+    - skip: 건너뛴 결과 수
+    - limit: 최대 조회 수
+    - products: 상품 목록
     """
     try:
-        # 쿼리 빌더
+        # 쿼리 빌더 - 인덱스 활용을 위해 순서 최적화
         query_conditions = []
 
-        if keyword:
-            # 텍스트 검색 (제목, 브랜드, 제조사)
-            query_conditions.append({
-                "$or": [
-                    {"title": {"$regex": keyword, "$options": "i"}},
-                    {"brand": {"$regex": keyword, "$options": "i"}},
-                    {"maker": {"$regex": keyword, "$options": "i"}},
-                    {"tags": {"$in": [keyword]}}
-                ]
-            })
-
+        # 인덱스가 있는 필드 우선 처리
         if category1:
             query_conditions.append({"category1": category1})
 
         if mall_name:
             query_conditions.append({"mallName": {"$regex": mall_name, "$options": "i"}})
+
+        if keyword:
+            # 텍스트 검색 (제목, 브랜드, 제조사)
+            # tags는 배열이므로 별도 처리
+            query_conditions.append({
+                "$or": [
+                    {"title": {"$regex": keyword, "$options": "i"}},
+                    {"brand": {"$regex": keyword, "$options": "i"}},
+                    {"maker": {"$regex": keyword, "$options": "i"}},
+                    {"tags": keyword}  # 배열 검색 최적화
+                ]
+            })
 
         if min_price is not None or max_price is not None:
             price_condition = {}
@@ -225,9 +237,10 @@ async def search_products(
 
         # 최종 쿼리 구성
         if query_conditions:
-            final_query = {"$and": query_conditions}
-            # 총 개수 계산
-            total_count = await Product.find(final_query).count()
+            final_query = {"$and": query_conditions} if len(query_conditions) > 1 else query_conditions[0]
+            # 쿼리 재사용을 위한 find 객체 생성
+            query_obj = Product.find(final_query)
+            total_count = await query_obj.count()
             products = await Product.find(final_query).skip(skip).limit(limit).to_list()
         else:
             total_count = await Product.count()
@@ -242,7 +255,7 @@ async def search_products(
         }
 
     except Exception as e:
-        logger.error(f"Error searching products: {str(e)}")
+        logger.error(f"상품 검색 오류: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"상품 검색 중 오류가 발생했습니다: {str(e)}")
 
 
@@ -276,7 +289,7 @@ async def list_products(
         products = await Product.find_all().skip(skip).limit(limit).to_list()
         return products
     except Exception as e:
-        logger.error(f"Error listing products: {str(e)}")
+        logger.error(f"상품 목록 조회 오류: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"상품 조회 중 오류가 발생했습니다: {str(e)}")
 
 
@@ -305,13 +318,16 @@ async def get_stats():
     try:
         total_products = await Product.count()
 
+        # Beanie 2.0에서는 aggregate를 직접 사용하지 않고 get_pymongo_collection()을 통해 접근
+        collection = Product.get_pymongo_collection()
+
         # 쇼핑몰별 집계
         pipeline = [
             {"$group": {"_id": "$mallName", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        mall_stats = await Product.aggregate(pipeline).to_list()
+        mall_stats = await collection.aggregate(pipeline).to_list(length=10)
 
         # 카테고리별 집계
         pipeline = [
@@ -319,7 +335,7 @@ async def get_stats():
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        category_stats = await Product.aggregate(pipeline).to_list()
+        category_stats = await collection.aggregate(pipeline).to_list(length=10)
 
         return {
             "total_products": total_products,
@@ -329,7 +345,7 @@ async def get_stats():
         }
 
     except Exception as e:
-        logger.error(f"Error getting stats: {str(e)}")
+        logger.error(f"통계 조회 오류: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"통계 조회 중 오류가 발생했습니다: {str(e)}")
 
 
@@ -361,7 +377,7 @@ async def get_recent_collection_history(
         return result
 
     except Exception as e:
-        logger.error(f"Error getting collection history: {str(e)}")
+        logger.error(f"수집 이력 조회 오류: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"수집 이력 조회 중 오류가 발생했습니다: {str(e)}")
 
 
@@ -394,5 +410,5 @@ async def get_keyword_collection_history(
         return result
 
     except Exception as e:
-        logger.error(f"Error getting keyword history: {str(e)}")
+        logger.error(f"키워드 이력 조회 오류 (keyword={keyword}): {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"키워드 이력 조회 중 오류가 발생했습니다: {str(e)}")
