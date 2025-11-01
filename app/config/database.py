@@ -16,6 +16,7 @@ from beanie import init_beanie
 
 from app.config import settings
 from app.models import Product, ProductSearchResponse
+from app.models.batch import BatchCollection, BatchKeyword
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ class Database:
                 serverSelectionTimeoutMS=settings.MONGODB_SERVER_SELECTION_TIMEOUT_MS,
                 maxPoolSize=settings.MONGODB_MAX_POOL_SIZE,
                 minPoolSize=settings.MONGODB_MIN_POOL_SIZE,
+                retryWrites=True,  # 쓰기 재시도 활성화 (안정성 향상)
+                retryReads=True,   # 읽기 재시도 활성화 (안정성 향상)
+                w="majority",      # 쓰기 승인 수준 (과반수 확인)
             )
 
             # 데이터베이스 선택
@@ -72,10 +76,10 @@ class Database:
             logger.info("MongoDB 연결 테스트 성공")
 
             # Beanie ODM 초기화
-            # Product, ProductSearchResponse 모델을 MongoDB 컬렉션과 매핑
+            # Product, ProductSearchResponse, Batch 모델을 MongoDB 컬렉션과 매핑
             await init_beanie(
                 database=cls.database,
-                document_models=[Product, ProductSearchResponse]
+                document_models=[Product, ProductSearchResponse, BatchCollection, BatchKeyword]
             )
 
             logger.info(f"MongoDB 연결 성공: {settings.MONGODB_DB_NAME}")

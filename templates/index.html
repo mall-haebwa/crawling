@@ -273,48 +273,6 @@
             padding-top: 20px;
             border-top: 1px solid #f4c790;
         }
-
-        .collection-history-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .history-item {
-            background: white;
-            padding: 12px 15px;
-            border-radius: 6px;
-            border: 1px solid #fde68a;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.2s;
-        }
-
-        .history-item:hover {
-            background: #fef9f3;
-        }
-
-        .history-info {
-            flex: 1;
-        }
-
-        .history-keyword {
-            font-weight: 600;
-            color: #92400e;
-            font-size: 1em;
-            margin-bottom: 4px;
-        }
-
-        .history-meta {
-            font-size: 0.85em;
-            color: #78716c;
-        }
-
-        .history-actions {
-            display: flex;
-            gap: 8px;
-        }
     </style>
 </head>
 <body>
@@ -348,11 +306,89 @@
                     <option value="dsc">가격 높은순</option>
                 </select>
                 <button type="submit">수집 시작</button>
+                <button type="button" onclick="toggleCollectionHistory()" style="background: #6b7280; margin-left: 10px;">수집 이력</button>
             </form>
 
-            <div class="collection-history-section">
-                <h3 style="margin-top: 25px; margin-bottom: 15px; color: #92400e;">최근 수집 이력</h3>
-                <div id="collection-history" class="collection-history-list">
+            <div id="collection-history-section" class="collection-history-section" style="display: none;">
+                <h3 style="margin-top: 25px; margin-bottom: 15px; color: #92400e;">최근 수집 이력 (10개)</h3>
+                <div id="collection-history" style="background: #fef9f3; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                    <div class="loading">이력 로딩 중...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 일괄 수집 섹션 -->
+        <div class="search-section" style="border-top: 2px solid #e5e7eb; margin-top: 30px; padding-top: 30px;">
+            <h2>📄 일괄 수집 (CSV 업로드)</h2>
+            <p style="color: #6b7280; margin-bottom: 20px;">키워드 목록 CSV 파일을 업로드하여 자동으로 수집합니다. (각 키워드당 1000개)</p>
+
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <input type="file" id="csv-file" accept=".csv" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="rate-limit" style="color: #6b7280; font-size: 14px;">키워드 간격:</label>
+                    <input type="number" id="rate-limit" value="10" min="5" max="300" style="width: 70px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <span style="color: #6b7280; font-size: 14px;">초</span>
+                </div>
+                <button onclick="uploadCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">업로드 & 수집 시작</button>
+                <button onclick="loadBatchHistory()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">이력 새로고침</button>
+            </div>
+
+            <div id="batch-status" style="display: none; background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; border: 1px solid #e5e7eb;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 2px solid #f3f4f6;">
+                    <h3 style="margin: 0; color: #1f2937; font-size: 16px; font-weight: 600;">배치 수집 현황</h3>
+                    <div id="batch-status-badge" style="background: #667eea; color: white; padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;">진행중</div>
+                </div>
+
+                <!-- 진행률 바 -->
+                <div style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="color: #6b7280; font-size: 14px;" id="batch-progress-text">0 / 0 완료</span>
+                        <span style="color: #667eea; font-weight: 600; font-size: 14px;" id="batch-percentage">0%</span>
+                    </div>
+                    <div style="background: #e5e7eb; height: 8px; border-radius: 4px; overflow: hidden;">
+                        <div id="batch-progress-bar" style="background: #667eea; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+
+                <!-- 통계 -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 15px;">
+                    <div style="text-align: center; padding: 10px; background: #f9fafb; border-radius: 6px;">
+                        <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">완료</div>
+                        <div style="font-size: 20px; font-weight: 600; color: #10b981;" id="batch-completed">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: #f9fafb; border-radius: 6px;">
+                        <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">건너뜀</div>
+                        <div style="font-size: 20px; font-weight: 600; color: #f59e0b;" id="batch-skipped">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: #f9fafb; border-radius: 6px;">
+                        <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">실패</div>
+                        <div style="font-size: 20px; font-weight: 600; color: #ef4444;" id="batch-failed">0</div>
+                    </div>
+                    <div style="text-align: center; padding: 10px; background: #f9fafb; border-radius: 6px;">
+                        <div style="font-size: 11px; color: #6b7280; margin-bottom: 4px;">총 상품</div>
+                        <div style="font-size: 20px; font-weight: 600; color: #667eea;" id="batch-total-products">0</div>
+                    </div>
+                </div>
+
+                <!-- 현재 키워드 -->
+                <div id="batch-current-section" style="padding: 12px; background: #f9fafb; border-radius: 6px; margin-bottom: 15px;">
+                    <div style="font-size: 12px; color: #6b7280; margin-bottom: 4px;">현재 키워드</div>
+                    <div style="font-weight: 500; color: #1f2937;" id="batch-current-keyword">-</div>
+                </div>
+
+                <!-- 제어 버튼 -->
+                <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;">
+                    <button id="batch-pause-btn" onclick="pauseBatch()" style="display: none; padding: 8px 16px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">일시정지</button>
+                    <button id="batch-resume-btn" onclick="resumeBatch()" style="display: none; padding: 8px 16px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">재개</button>
+                    <button id="batch-cancel-btn" onclick="cancelBatch()" style="display: none; padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">취소</button>
+                    <button id="batch-delete-btn" onclick="deleteBatch()" style="display: none; padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 13px;">삭제</button>
+                </div>
+            </div>
+
+            <!-- 배치 이력 -->
+            <div id="batch-history" style="margin-bottom: 20px; display: none;">
+                <h3 style="margin-bottom: 10px;">최근 배치 이력</h3>
+                <div id="batch-history-list" style="background: #f9fafb; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
                     <div class="loading">이력 로딩 중...</div>
                 </div>
             </div>
@@ -396,6 +432,7 @@
             loadStats();
             loadProducts();
             loadCollectionHistory();
+            loadBatchHistory();
         };
 
         // 통계 로드
@@ -412,6 +449,15 @@
         }
 
         // 수집 이력 로드
+        function toggleCollectionHistory() {
+            const section = document.getElementById('collection-history-section');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
         async function loadCollectionHistory() {
             try {
                 const response = await fetch('/products/history/recent?limit=10');
@@ -420,32 +466,29 @@
                 const historyDiv = document.getElementById('collection-history');
 
                 if (history.length === 0) {
-                    historyDiv.innerHTML = '<div class="loading">수집 이력이 없습니다.</div>';
+                    historyDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">수집 이력이 없습니다.</div>';
                     return;
                 }
 
                 historyDiv.innerHTML = history.map(item => {
                     const date = new Date(item.collected_at);
-                    const dateStr = date.toLocaleString('ko-KR', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
+                    const dateStr = date.toLocaleString('ko-KR');
 
                     const sortLabel = {
-                        'sim': '정확도순',
-                        'date': '날짜순',
+                        'sim': '정확도',
+                        'date': '날짜',
                         'asc': '가격↑',
                         'dsc': '가격↓'
                     }[item.sort] || item.sort;
 
                     return `
-                        <div class="history-item">
-                            <div class="history-info">
-                                <div class="history-keyword">${item.keyword}</div>
-                                <div class="history-meta">
-                                    ${item.total_count.toLocaleString()}개 수집 · ${sortLabel} · ${dateStr}
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #f59e0b;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 500; color: #92400e;">${item.keyword}</div>
+                                    <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
+                                        ${item.total_count.toLocaleString()}개 · ${sortLabel} · ${dateStr}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -454,7 +497,7 @@
             } catch (error) {
                 console.error('수집 이력 로드 실패:', error);
                 document.getElementById('collection-history').innerHTML =
-                    '<div class="loading">이력을 불러오는데 실패했습니다.</div>';
+                    '<div style="text-align: center; padding: 20px; color: #ef4444;">이력을 불러오는데 실패했습니다.</div>';
             }
         }
 
@@ -639,6 +682,362 @@
                 loadSearchResults();
             } else {
                 loadProducts();
+            }
+        }
+
+        // ========== 일괄 수집 기능 ==========
+        let currentBatchId = null;
+        let batchWebSocket = null;
+
+        async function uploadCSV() {
+            const fileInput = document.getElementById('csv-file');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('CSV 파일을 선택해주세요.');
+                return;
+            }
+
+            const rateLimitSeconds = parseInt(document.getElementById('rate-limit').value);
+            if (rateLimitSeconds < 5 || rateLimitSeconds > 300) {
+                alert('키워드 간격은 5초에서 300초 사이여야 합니다.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`/batch/upload?rate_limit_seconds=${rateLimitSeconds}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`배치 수집이 시작되었습니다!\n키워드 ${result.total_keywords}개`);
+                    currentBatchId = result.batch_id;
+
+                    // 현황판 표시
+                    document.getElementById('batch-status').style.display = 'block';
+
+                    // 이력 새로고침
+                    loadBatchHistory();
+
+                    // WebSocket 연결
+                    connectBatchWebSocket(result.batch_id);
+                } else {
+                    alert(`업로드 실패: ${result.detail || '알 수 없는 오류'}`);
+                }
+            } catch (error) {
+                alert(`업로드 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        function connectBatchWebSocket(batchId) {
+            // 기존 WebSocket 연결이 있으면 종료
+            if (batchWebSocket) {
+                batchWebSocket.close();
+            }
+
+            // WebSocket 연결 (ws:// 또는 wss://)
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/batch/${batchId}`;
+
+            batchWebSocket = new WebSocket(wsUrl);
+
+            batchWebSocket.onopen = () => {
+                console.log(`WebSocket 연결됨: ${batchId}`);
+            };
+
+            batchWebSocket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                updateBatchStatusUI(data);
+            };
+
+            batchWebSocket.onerror = (error) => {
+                console.error('WebSocket 오류:', error);
+            };
+
+            batchWebSocket.onclose = () => {
+                console.log('WebSocket 연결 종료');
+            };
+
+            // 연결 유지를 위한 ping (30초마다)
+            setInterval(() => {
+                if (batchWebSocket && batchWebSocket.readyState === WebSocket.OPEN) {
+                    batchWebSocket.send('ping');
+                }
+            }, 30000);
+        }
+
+        function updateBatchStatusUI(data) {
+            if (!data) return;
+
+            try {
+
+                // 진행률 업데이트
+                const progress = data.progress;
+                document.getElementById('batch-progress-text').textContent =
+                    `${progress.completed + progress.failed + progress.skipped} / ${progress.total} 완료`;
+                document.getElementById('batch-percentage').textContent =
+                    `${progress.percentage.toFixed(1)}%`;
+                document.getElementById('batch-progress-bar').style.width =
+                    `${progress.percentage}%`;
+
+                // 통계 업데이트
+                document.getElementById('batch-completed').textContent = progress.completed;
+                document.getElementById('batch-skipped').textContent = progress.skipped;
+                document.getElementById('batch-failed').textContent = progress.failed;
+
+                // 현재 키워드
+                const currentKeywordEl = document.getElementById('batch-current-keyword');
+                if (data.status === 'completed') {
+                    currentKeywordEl.textContent = '✓ 모든 작업 완료';
+                    currentKeywordEl.style.color = '#10b981';
+                } else if (data.status === 'paused') {
+                    currentKeywordEl.textContent = '⏸ 일시정지됨';
+                    currentKeywordEl.style.color = '#f59e0b';
+                } else if (data.status === 'cancelled') {
+                    currentKeywordEl.textContent = '✕ 취소됨';
+                    currentKeywordEl.style.color = '#ef4444';
+                } else if (data.status === 'failed') {
+                    currentKeywordEl.textContent = '✕ 실패';
+                    currentKeywordEl.style.color = '#ef4444';
+                } else if (data.current_keyword && data.current_keyword.keyword) {
+                    currentKeywordEl.textContent = data.current_keyword.keyword;
+                    currentKeywordEl.style.color = '#1f2937';
+                } else {
+                    currentKeywordEl.textContent = '대기 중...';
+                    currentKeywordEl.style.color = '#6b7280';
+                }
+
+                // 총 수집 상품 수
+                document.getElementById('batch-total-products').textContent =
+                    data.stats.total_products.toLocaleString();
+
+                // 상태 뱃지 업데이트
+                const statusBadge = document.getElementById('batch-status-badge');
+                const statusLabels = {
+                    'pending': '대기중',
+                    'running': '진행중',
+                    'paused': '일시정지',
+                    'completed': '완료',
+                    'failed': '실패',
+                    'cancelled': '취소됨'
+                };
+                statusBadge.textContent = statusLabels[data.status] || data.status;
+
+                // 버튼 표시 제어
+                updateBatchButtons(data.status);
+
+                // 완료/취소되면 WebSocket 종료
+                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
+                    if (batchWebSocket) {
+                        batchWebSocket.close();
+                        batchWebSocket = null;
+                    }
+                    if (data.status === 'completed') {
+                        alert(`배치 수집이 완료되었습니다!\n완료: ${progress.completed}개, 건너뜀: ${progress.skipped}개, 실패: ${progress.failed}개`);
+                        loadProducts(); // 상품 목록 새로고침
+                        loadStats(); // 통계 새로고침
+                    } else if (data.status === 'cancelled') {
+                        alert('배치가 취소되었습니다.');
+                    }
+                }
+            } catch (error) {
+                console.error('배치 상태 UI 업데이트 실패:', error);
+            }
+        }
+
+        function updateBatchButtons(status) {
+            // 모든 버튼 숨기기
+            document.getElementById('batch-pause-btn').style.display = 'none';
+            document.getElementById('batch-resume-btn').style.display = 'none';
+            document.getElementById('batch-cancel-btn').style.display = 'none';
+            document.getElementById('batch-delete-btn').style.display = 'none';
+
+            // 상태에 따라 버튼 표시
+            if (status === 'running') {
+                document.getElementById('batch-pause-btn').style.display = 'inline-block';
+                document.getElementById('batch-cancel-btn').style.display = 'inline-block';
+            } else if (status === 'paused') {
+                document.getElementById('batch-resume-btn').style.display = 'inline-block';
+                document.getElementById('batch-cancel-btn').style.display = 'inline-block';
+            } else if (status === 'completed' || status === 'cancelled' || status === 'failed') {
+                document.getElementById('batch-delete-btn').style.display = 'inline-block';
+            }
+        }
+
+        async function pauseBatch() {
+            if (!currentBatchId) return;
+
+            try {
+                const response = await fetch(`/batch/${currentBatchId}/pause`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('배치가 일시정지되었습니다.');
+                    updateBatchStatus();
+                } else {
+                    alert(`오류: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`일시정지 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        async function resumeBatch() {
+            if (!currentBatchId) return;
+
+            try {
+                const response = await fetch(`/batch/${currentBatchId}/resume`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('배치가 재개되었습니다.');
+                    startBatchStatusPolling();
+                } else {
+                    alert(`오류: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`재개 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        async function cancelBatch() {
+            if (!currentBatchId) return;
+
+            if (!confirm('정말 배치를 취소하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/batch/${currentBatchId}/cancel`, {
+                    method: 'POST'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('배치가 취소되었습니다.');
+                    updateBatchStatus();
+                } else {
+                    alert(`오류: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`취소 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        async function deleteBatch() {
+            if (!currentBatchId) return;
+
+            if (!confirm('배치 기록을 삭제하시겠습니까?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/batch/${currentBatchId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+
+                if (response.ok) {
+                    alert('배치가 삭제되었습니다.');
+                    document.getElementById('batch-status').style.display = 'none';
+                    currentBatchId = null;
+                    loadBatchHistory(); // 이력 새로고침
+                } else {
+                    alert(`오류: ${data.detail}`);
+                }
+            } catch (error) {
+                alert(`삭제 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        async function loadBatchHistory() {
+            try {
+                const response = await fetch('/batch/list?limit=10');
+                const data = await response.json();
+
+                const historyDiv = document.getElementById('batch-history');
+                const listDiv = document.getElementById('batch-history-list');
+
+                if (data.batches.length === 0) {
+                    historyDiv.style.display = 'none';
+                    return;
+                }
+
+                historyDiv.style.display = 'block';
+
+                // 배치 목록 생성
+                const statusColors = {
+                    'pending': '#6b7280',
+                    'running': '#3b82f6',
+                    'paused': '#f59e0b',
+                    'completed': '#10b981',
+                    'failed': '#ef4444',
+                    'cancelled': '#9ca3af'
+                };
+
+                const statusLabels = {
+                    'pending': '대기',
+                    'running': '실행중',
+                    'paused': '일시정지',
+                    'completed': '완료',
+                    'failed': '실패',
+                    'cancelled': '취소됨'
+                };
+
+                listDiv.innerHTML = data.batches.map(batch => {
+                    const date = new Date(batch.created_at);
+                    const dateStr = date.toLocaleString('ko-KR');
+                    const statusColor = statusColors[batch.status] || '#6b7280';
+                    const statusLabel = statusLabels[batch.status] || batch.status;
+
+                    return `
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid ${statusColor};" onclick="viewBatchDetail('${batch.batch_id}')">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 500;">${batch.csv_filename}</div>
+                                    <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
+                                        ${batch.completed_keywords}/${batch.total_keywords} 완료 • ${dateStr}
+                                    </div>
+                                </div>
+                                <div style="padding: 4px 12px; background: ${statusColor}; color: white; border-radius: 4px; font-size: 13px;">
+                                    ${statusLabel}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('배치 이력 로드 실패:', error);
+            }
+        }
+
+        async function viewBatchDetail(batchId) {
+            currentBatchId = batchId;
+            document.getElementById('batch-status').style.display = 'block';
+
+            // 스크롤 이동
+            document.getElementById('batch-status').scrollIntoView({ behavior: 'smooth' });
+
+            // 상태 업데이트
+            await updateBatchStatus();
+
+            // 상태가 running이면 폴링 시작
+            const response = await fetch(`/batch/${batchId}/status`);
+            const data = await response.json();
+
+            if (data.status === 'running') {
+                startBatchStatusPolling();
             }
         }
     </script>
