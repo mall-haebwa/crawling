@@ -333,40 +333,62 @@
                 <button onclick="loadBatchHistory()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">이력 새로고침</button>
             </div>
 
-            <div id="batch-status" style="display: none; padding: 20px; background: #f3f4f6; border-radius: 8px; margin-bottom: 20px;">
-                <h3 style="margin-bottom: 15px;">진행 현황</h3>
-                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                        <span id="batch-progress-text">0 / 0 완료</span>
-                        <span id="batch-percentage">0%</span>
+            <div id="batch-status" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 24px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: white; font-size: 18px; display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 24px;">📊</span> 배치 수집 진행 중
+                    </h3>
+                    <div id="batch-status-badge" style="background: rgba(255, 255, 255, 0.2); color: white; padding: 6px 12px; border-radius: 20px; font-size: 13px; font-weight: 600;">진행중</div>
+                </div>
+
+                <!-- 진행률 바 -->
+                <div style="background: rgba(255, 255, 255, 0.2); padding: 20px; border-radius: 10px; margin-bottom: 16px; backdrop-filter: blur(10px);">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="color: white; font-weight: 600; font-size: 15px;" id="batch-progress-text">0 / 0 완료</span>
+                        <span style="color: white; font-weight: 700; font-size: 18px;" id="batch-percentage">0%</span>
                     </div>
-                    <div style="background: #e5e7eb; height: 20px; border-radius: 10px; overflow: hidden;">
-                        <div id="batch-progress-bar" style="background: #667eea; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    <div style="background: rgba(0, 0, 0, 0.2); height: 12px; border-radius: 6px; overflow: hidden;">
+                        <div id="batch-progress-bar" style="background: linear-gradient(90deg, #10b981 0%, #34d399 100%); height: 100%; width: 0%; transition: width 0.5s ease; box-shadow: 0 0 10px rgba(16, 185, 129, 0.5);"></div>
                     </div>
                 </div>
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
-                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #10b981;" id="batch-completed">0</div>
-                        <div style="color: #6b7280; font-size: 14px;">완료</div>
+
+                <!-- 통계 카드 -->
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px;">
+                    <div style="background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px; font-weight: 500;">✅ 완료</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #10b981;" id="batch-completed">0</div>
                     </div>
-                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #f59e0b;" id="batch-skipped">0</div>
-                        <div style="color: #6b7280; font-size: 14px;">건너뜀</div>
+                    <div style="background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px; font-weight: 500;">⏭️ 건너뜀</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #f59e0b;" id="batch-skipped">0</div>
                     </div>
-                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #ef4444;" id="batch-failed">0</div>
-                        <div style="color: #6b7280; font-size: 14px;">실패</div>
+                    <div style="background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px; font-weight: 500;">❌ 실패</div>
+                        <div style="font-size: 28px; font-weight: 700; color: #ef4444;" id="batch-failed">0</div>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 13px; color: #6b7280; margin-bottom: 6px; font-weight: 500;">📦 총 상품</div>
+                        <div style="font-size: 24px; font-weight: 700; color: #667eea;" id="batch-total-products">0</div>
                     </div>
                 </div>
-                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
-                    <div style="font-weight: 500; margin-bottom: 5px;">현재 키워드: <span id="batch-current-keyword">-</span></div>
-                    <div style="color: #6b7280; font-size: 14px;">총 수집: <span id="batch-total-products">0</span>개</div>
+
+                <!-- 현재 작업 정보 -->
+                <div style="background: rgba(255, 255, 255, 0.95); padding: 16px; border-radius: 10px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+                    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                        <span style="font-size: 20px;">🔍</span>
+                        <div style="flex: 1;">
+                            <div style="font-size: 13px; color: #6b7280; margin-bottom: 4px;">현재 처리 중인 키워드</div>
+                            <div style="font-weight: 600; color: #1f2937; font-size: 16px;" id="batch-current-keyword">-</div>
+                        </div>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 10px; justify-content: center;">
-                    <button id="batch-pause-btn" onclick="pauseBatch()" style="display: none; padding: 10px 20px; background: #f59e0b; color: white; border: none; border-radius: 6px; cursor: pointer;">일시정지</button>
-                    <button id="batch-resume-btn" onclick="resumeBatch()" style="display: none; padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">재개</button>
-                    <button id="batch-cancel-btn" onclick="cancelBatch()" style="display: none; padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">취소</button>
-                    <button id="batch-delete-btn" onclick="deleteBatch()" style="display: none; padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">삭제</button>
+
+                <!-- 제어 버튼 -->
+                <div style="display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;">
+                    <button id="batch-pause-btn" onclick="pauseBatch()" style="display: none; padding: 12px 24px; background: rgba(245, 158, 11, 0.9); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);" onmouseover="this.style.background='rgba(245, 158, 11, 1)'" onmouseout="this.style.background='rgba(245, 158, 11, 0.9)'">⏸️ 일시정지</button>
+                    <button id="batch-resume-btn" onclick="resumeBatch()" style="display: none; padding: 12px 24px; background: rgba(16, 185, 129, 0.9); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);" onmouseover="this.style.background='rgba(16, 185, 129, 1)'" onmouseout="this.style.background='rgba(16, 185, 129, 0.9)'">▶️ 재개</button>
+                    <button id="batch-cancel-btn" onclick="cancelBatch()" style="display: none; padding: 12px 24px; background: rgba(239, 68, 68, 0.9); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);" onmouseover="this.style.background='rgba(239, 68, 68, 1)'" onmouseout="this.style.background='rgba(239, 68, 68, 0.9)'">🛑 취소</button>
+                    <button id="batch-delete-btn" onclick="deleteBatch()" style="display: none; padding: 12px 24px; background: rgba(107, 114, 128, 0.9); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 14px; transition: all 0.2s; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);" onmouseover="this.style.background='rgba(107, 114, 128, 1)'" onmouseout="this.style.background='rgba(107, 114, 128, 0.9)'">🗑️ 삭제</button>
                 </div>
             </div>
 
@@ -765,6 +787,18 @@
                 // 총 수집 상품 수
                 document.getElementById('batch-total-products').textContent =
                     data.stats.total_products.toLocaleString();
+
+                // 상태 뱃지 업데이트
+                const statusBadge = document.getElementById('batch-status-badge');
+                const statusLabels = {
+                    'pending': '대기중',
+                    'running': '진행중',
+                    'paused': '일시정지',
+                    'completed': '완료',
+                    'failed': '실패',
+                    'cancelled': '취소됨'
+                };
+                statusBadge.textContent = statusLabels[data.status] || data.status;
 
                 // 버튼 표시 제어
                 updateBatchButtons(data.status);
