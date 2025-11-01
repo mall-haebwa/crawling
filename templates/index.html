@@ -273,48 +273,6 @@
             padding-top: 20px;
             border-top: 1px solid #f4c790;
         }
-
-        .collection-history-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
-        .history-item {
-            background: white;
-            padding: 12px 15px;
-            border-radius: 6px;
-            border: 1px solid #fde68a;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: background 0.2s;
-        }
-
-        .history-item:hover {
-            background: #fef9f3;
-        }
-
-        .history-info {
-            flex: 1;
-        }
-
-        .history-keyword {
-            font-weight: 600;
-            color: #92400e;
-            font-size: 1em;
-            margin-bottom: 4px;
-        }
-
-        .history-meta {
-            font-size: 0.85em;
-            color: #78716c;
-        }
-
-        .history-actions {
-            display: flex;
-            gap: 8px;
-        }
     </style>
 </head>
 <body>
@@ -348,11 +306,12 @@
                     <option value="dsc">가격 높은순</option>
                 </select>
                 <button type="submit">수집 시작</button>
+                <button type="button" onclick="toggleCollectionHistory()" style="background: #6b7280; margin-left: 10px;">수집 이력</button>
             </form>
 
-            <div class="collection-history-section">
-                <h3 style="margin-top: 25px; margin-bottom: 15px; color: #92400e;">최근 수집 이력</h3>
-                <div id="collection-history" class="collection-history-list">
+            <div id="collection-history-section" class="collection-history-section" style="display: none;">
+                <h3 style="margin-top: 25px; margin-bottom: 15px; color: #92400e;">최근 수집 이력 (10개)</h3>
+                <div id="collection-history" style="background: #fef9f3; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
                     <div class="loading">이력 로딩 중...</div>
                 </div>
             </div>
@@ -475,6 +434,15 @@
         }
 
         // 수집 이력 로드
+        function toggleCollectionHistory() {
+            const section = document.getElementById('collection-history-section');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+            } else {
+                section.style.display = 'none';
+            }
+        }
+
         async function loadCollectionHistory() {
             try {
                 const response = await fetch('/products/history/recent?limit=10');
@@ -483,32 +451,29 @@
                 const historyDiv = document.getElementById('collection-history');
 
                 if (history.length === 0) {
-                    historyDiv.innerHTML = '<div class="loading">수집 이력이 없습니다.</div>';
+                    historyDiv.innerHTML = '<div style="text-align: center; padding: 20px; color: #6b7280;">수집 이력이 없습니다.</div>';
                     return;
                 }
 
                 historyDiv.innerHTML = history.map(item => {
                     const date = new Date(item.collected_at);
-                    const dateStr = date.toLocaleString('ko-KR', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                    });
+                    const dateStr = date.toLocaleString('ko-KR');
 
                     const sortLabel = {
-                        'sim': '정확도순',
-                        'date': '날짜순',
+                        'sim': '정확도',
+                        'date': '날짜',
                         'asc': '가격↑',
                         'dsc': '가격↓'
                     }[item.sort] || item.sort;
 
                     return `
-                        <div class="history-item">
-                            <div class="history-info">
-                                <div class="history-keyword">${item.keyword}</div>
-                                <div class="history-meta">
-                                    ${item.total_count.toLocaleString()}개 수집 · ${sortLabel} · ${dateStr}
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #f59e0b;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 500; color: #92400e;">${item.keyword}</div>
+                                    <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
+                                        ${item.total_count.toLocaleString()}개 · ${sortLabel} · ${dateStr}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -517,7 +482,7 @@
             } catch (error) {
                 console.error('수집 이력 로드 실패:', error);
                 document.getElementById('collection-history').innerHTML =
-                    '<div class="loading">이력을 불러오는데 실패했습니다.</div>';
+                    '<div style="text-align: center; padding: 20px; color: #ef4444;">이력을 불러오는데 실패했습니다.</div>';
             }
         }
 
