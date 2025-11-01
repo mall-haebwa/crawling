@@ -54,7 +54,7 @@ class BatchCollectionService:
             # 키워드 목록 조회 (순서대로)
             keywords = await BatchKeyword.find(
                 BatchKeyword.batch_id == batch_id,
-                BatchKeyword.status.in_(["pending", "failed"])
+                {"status": {"$in": ["pending", "failed"]}}
             ).sort("order").to_list()
 
             # 순차 실행

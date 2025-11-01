@@ -358,6 +358,49 @@
             </div>
         </div>
 
+        <!-- 일괄 수집 섹션 -->
+        <div class="search-section" style="border-top: 2px solid #e5e7eb; margin-top: 30px; padding-top: 30px;">
+            <h2>📄 일괄 수집 (CSV 업로드)</h2>
+            <p style="color: #6b7280; margin-bottom: 20px;">키워드 목록 CSV 파일을 업로드하여 자동으로 수집합니다. (각 키워드당 1000개, 1분 간격)</p>
+
+            <div style="margin-bottom: 20px;">
+                <input type="file" id="csv-file" accept=".csv" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
+                <button onclick="uploadCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">업로드 & 수집 시작</button>
+                <a href="/static/keywords_sample.csv" download style="margin-left: 10px; color: #667eea;">샘플 CSV 다운로드</a>
+            </div>
+
+            <div id="batch-status" style="display: none; padding: 20px; background: #f3f4f6; border-radius: 8px; margin-top: 20px;">
+                <h3 style="margin-bottom: 15px;">진행 현황</h3>
+                <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                        <span id="batch-progress-text">0 / 0 완료</span>
+                        <span id="batch-percentage">0%</span>
+                    </div>
+                    <div style="background: #e5e7eb; height: 20px; border-radius: 10px; overflow: hidden;">
+                        <div id="batch-progress-bar" style="background: #667eea; height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 15px;">
+                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #10b981;" id="batch-completed">0</div>
+                        <div style="color: #6b7280; font-size: 14px;">완료</div>
+                    </div>
+                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #f59e0b;" id="batch-skipped">0</div>
+                        <div style="color: #6b7280; font-size: 14px;">건너뜀</div>
+                    </div>
+                    <div style="background: white; padding: 10px; border-radius: 6px; text-align: center;">
+                        <div style="font-size: 24px; font-weight: bold; color: #ef4444;" id="batch-failed">0</div>
+                        <div style="color: #6b7280; font-size: 14px;">실패</div>
+                    </div>
+                </div>
+                <div style="background: white; padding: 15px; border-radius: 6px;">
+                    <div style="font-weight: 500; margin-bottom: 5px;">현재 키워드: <span id="batch-current-keyword">-</span></div>
+                    <div style="color: #6b7280; font-size: 14px;">총 수집: <span id="batch-total-products">0</span>개</div>
+                </div>
+            </div>
+        </div>
+
         <div class="search-section">
             <h2>상품 검색</h2>
             <form class="search-form" onsubmit="searchProducts(event)">
@@ -639,6 +682,105 @@
                 loadSearchResults();
             } else {
                 loadProducts();
+            }
+        }
+
+        // ========== 일괄 수집 기능 ==========
+        let currentBatchId = null;
+        let batchStatusInterval = null;
+
+        async function uploadCSV() {
+            const fileInput = document.getElementById('csv-file');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('CSV 파일을 선택해주세요.');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch('/batch/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    alert(`배치 수집이 시작되었습니다!\n키워드 ${result.total_keywords}개`);
+                    currentBatchId = result.batch_id;
+
+                    // 현황판 표시
+                    document.getElementById('batch-status').style.display = 'block';
+
+                    // 5초마다 상태 업데이트
+                    startBatchStatusPolling();
+                } else {
+                    alert(`업로드 실패: ${result.detail || '알 수 없는 오류'}`);
+                }
+            } catch (error) {
+                alert(`업로드 중 오류 발생: ${error.message}`);
+            }
+        }
+
+        function startBatchStatusPolling() {
+            // 기존 인터벌 정리
+            if (batchStatusInterval) {
+                clearInterval(batchStatusInterval);
+            }
+
+            // 즉시 한 번 실행
+            updateBatchStatus();
+
+            // 5초마다 업데이트
+            batchStatusInterval = setInterval(updateBatchStatus, 5000);
+        }
+
+        async function updateBatchStatus() {
+            if (!currentBatchId) return;
+
+            try {
+                const response = await fetch(`/batch/${currentBatchId}/status`);
+                const data = await response.json();
+
+                // 진행률 업데이트
+                const progress = data.progress;
+                document.getElementById('batch-progress-text').textContent =
+                    `${progress.completed + progress.failed + progress.skipped} / ${progress.total} 완료`;
+                document.getElementById('batch-percentage').textContent =
+                    `${progress.percentage.toFixed(1)}%`;
+                document.getElementById('batch-progress-bar').style.width =
+                    `${progress.percentage}%`;
+
+                // 통계 업데이트
+                document.getElementById('batch-completed').textContent = progress.completed;
+                document.getElementById('batch-skipped').textContent = progress.skipped;
+                document.getElementById('batch-failed').textContent = progress.failed;
+
+                // 현재 키워드
+                if (data.current_keyword) {
+                    document.getElementById('batch-current-keyword').textContent =
+                        data.current_keyword.keyword || '-';
+                } else {
+                    document.getElementById('batch-current-keyword').textContent = '-';
+                }
+
+                // 총 수집 상품 수
+                document.getElementById('batch-total-products').textContent =
+                    data.stats.total_products.toLocaleString();
+
+                // 완료되면 폴링 중지
+                if (data.status === 'completed' || data.status === 'failed') {
+                    clearInterval(batchStatusInterval);
+                    alert(`배치 수집이 완료되었습니다!\n완료: ${progress.completed}개, 건너뜀: ${progress.skipped}개, 실패: ${progress.failed}개`);
+                    loadProducts(); // 상품 목록 새로고침
+                    loadStats(); // 통계 새로고침
+                }
+            } catch (error) {
+                console.error('배치 상태 업데이트 실패:', error);
             }
         }
     </script>
