@@ -24,16 +24,34 @@ from app.routes import products_router
 from app.config import settings
 from app.services.naver_api import naver_api
 import logging
+from logging.handlers import RotatingFileHandler
+import os
+
+# 로깅 디렉토리 생성
+log_dir = "logs"
+if not os.path.exists(log_dir):
+    os.makedirs(log_dir)
 
 # 로깅 설정
-# 운영 환경에서는 파일 핸들러 추가 권장
+# 파일 로테이션: 최대 10MB, 최대 5개 백업 파일
+handlers = [
+    logging.StreamHandler(),  # 콘솔 출력
+]
+
+# 운영 환경에서는 파일 로그 활성화 권장
+if not settings.API_RELOAD:  # 운영 환경 (reload=False)
+    file_handler = RotatingFileHandler(
+        f"{log_dir}/app.log",
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8"
+    )
+    handlers.append(file_handler)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # 콘솔 출력
-        # logging.FileHandler("app.log"),  # 파일 출력 (필요시 활성화)
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 

@@ -66,10 +66,13 @@ class NaverShoppingAPI:
             limits 설정으로 동시 연결 수를 제어합니다.
         """
         if self._client is None:
-            # 연결 풀 설정: 최대 100개 연결, 호스트당 최대 20개 연결
-            limits = httpx.Limits(max_connections=100, max_keepalive_connections=20)
+            # 연결 풀 설정 (환경 변수로 제어)
+            limits = httpx.Limits(
+                max_connections=settings.HTTP_MAX_CONNECTIONS,
+                max_keepalive_connections=settings.HTTP_MAX_KEEPALIVE_CONNECTIONS
+            )
             self._client = httpx.AsyncClient(
-                timeout=30.0,
+                timeout=settings.HTTP_TIMEOUT,
                 limits=limits,
                 follow_redirects=True
             )
@@ -371,7 +374,6 @@ class NaverShoppingAPI:
             category2=categories.get("category2"),
             category3=categories.get("category3"),
             category4=categories.get("category4"),
-            productId=item.get("productId"),
             productType=product_type,
             product_group=product_group,
             product_category_type=product_category_type,
