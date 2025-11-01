@@ -301,6 +301,198 @@ async def get_batch_keywords(batch_id: str):
         )
 
 
+@router.post("/{batch_id}/pause")
+async def pause_batch(batch_id: str):
+    """
+    배치 수집 일시정지
+
+    실행 중인 배치를 일시정지합니다.
+    현재 처리 중인 키워드는 완료되고, 다음 키워드부터 중지됩니다.
+    """
+    try:
+        batch = await BatchCollection.find_one(
+            BatchCollection.batch_id == batch_id
+        )
+
+        if not batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"배치를 찾을 수 없습니다: {batch_id}"
+            )
+
+        if batch.status != "running":
+            raise HTTPException(
+                status_code=400,
+                detail=f"실행 중인 배치만 일시정지할 수 있습니다. 현재 상태: {batch.status}"
+            )
+
+        batch.status = "paused"
+        await batch.save()
+
+        logger.info(f"배치 일시정지: {batch_id}")
+
+        return {
+            "batch_id": batch_id,
+            "status": "paused",
+            "message": "배치가 일시정지되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 일시정지 오류: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="배치 일시정지 중 오류가 발생했습니다."
+        )
+
+
+@router.post("/{batch_id}/resume")
+async def resume_batch(batch_id: str, background_tasks: BackgroundTasks):
+    """
+    배치 수집 재개
+
+    일시정지된 배치를 재개합니다.
+    남은 키워드부터 다시 수집을 시작합니다.
+    """
+    try:
+        batch = await BatchCollection.find_one(
+            BatchCollection.batch_id == batch_id
+        )
+
+        if not batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"배치를 찾을 수 없습니다: {batch_id}"
+            )
+
+        if batch.status != "paused":
+            raise HTTPException(
+                status_code=400,
+                detail=f"일시정지된 배치만 재개할 수 있습니다. 현재 상태: {batch.status}"
+            )
+
+        # 백그라운드에서 재개
+        background_tasks.add_task(
+            batch_service.start_batch_collection,
+            batch_id
+        )
+
+        logger.info(f"배치 재개: {batch_id}")
+
+        return {
+            "batch_id": batch_id,
+            "status": "running",
+            "message": "배치가 재개되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 재개 오류: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="배치 재개 중 오류가 발생했습니다."
+        )
+
+
+@router.post("/{batch_id}/cancel")
+async def cancel_batch(batch_id: str):
+    """
+    배치 수집 취소
+
+    실행 중이거나 일시정지된 배치를 취소합니다.
+    현재 처리 중인 키워드는 완료되고, 나머지는 취소됩니다.
+    """
+    try:
+        batch = await BatchCollection.find_one(
+            BatchCollection.batch_id == batch_id
+        )
+
+        if not batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"배치를 찾을 수 없습니다: {batch_id}"
+            )
+
+        if batch.status not in ["running", "paused", "pending"]:
+            raise HTTPException(
+                status_code=400,
+                detail=f"실행 중이거나 일시정지된 배치만 취소할 수 있습니다. 현재 상태: {batch.status}"
+            )
+
+        batch.status = "cancelled"
+        batch.completed_at = datetime.utcnow()
+        await batch.save()
+
+        logger.info(f"배치 취소: {batch_id}")
+
+        return {
+            "batch_id": batch_id,
+            "status": "cancelled",
+            "message": "배치가 취소되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 취소 오류: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="배치 취소 중 오류가 발생했습니다."
+        )
+
+
+@router.delete("/{batch_id}")
+async def delete_batch(batch_id: str):
+    """
+    배치 삭제
+
+    완료되었거나 취소된 배치와 관련 키워드 데이터를 삭제합니다.
+    실행 중인 배치는 삭제할 수 없습니다.
+    """
+    try:
+        batch = await BatchCollection.find_one(
+            BatchCollection.batch_id == batch_id
+        )
+
+        if not batch:
+            raise HTTPException(
+                status_code=404,
+                detail=f"배치를 찾을 수 없습니다: {batch_id}"
+            )
+
+        if batch.status in ["running", "pending"]:
+            raise HTTPException(
+                status_code=400,
+                detail="실행 중인 배치는 삭제할 수 없습니다. 먼저 취소하세요."
+            )
+
+        # 관련 키워드 삭제
+        await BatchKeyword.find(
+            BatchKeyword.batch_id == batch_id
+        ).delete()
+
+        # 배치 삭제
+        await batch.delete()
+
+        logger.info(f"배치 삭제: {batch_id}")
+
+        return {
+            "batch_id": batch_id,
+            "message": "배치가 삭제되었습니다."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"배치 삭제 오류: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="배치 삭제 중 오류가 발생했습니다."
+        )
+
+
 @router.get("/list")
 async def list_batches(limit: int = 10):
     """

@@ -22,6 +22,9 @@ class BatchCollectionService:
         self.is_running = False
         """현재 배치 작업 실행 중 여부 (동시 실행 방지)"""
 
+        self.current_batch_id: str | None = None
+        """현재 실행 중인 배치 ID"""
+
     async def start_batch_collection(self, batch_id: str):
         """
         배치 수집 시작
@@ -36,6 +39,7 @@ class BatchCollectionService:
             raise ValueError("이미 실행 중인 배치 작업이 있습니다.")
 
         self.is_running = True
+        self.current_batch_id = batch_id
 
         try:
             batch = await BatchCollection.find_one(
@@ -46,7 +50,8 @@ class BatchCollectionService:
 
             # 상태 업데이트
             batch.status = "running"
-            batch.started_at = datetime.utcnow()
+            if not batch.started_at:  # 최초 시작인 경우만
+                batch.started_at = datetime.utcnow()
             await batch.save()
 
             logger.info(f"배치 수집 시작: {batch_id} ({batch.total_keywords}개 키워드)")
@@ -59,6 +64,18 @@ class BatchCollectionService:
 
             # 순차 실행
             for idx, keyword in enumerate(keywords):
+                # 일시정지 체크
+                batch = await BatchCollection.find_one(
+                    BatchCollection.batch_id == batch_id
+                )
+                if batch.status == "paused":
+                    logger.info(f"배치 일시정지됨: {batch_id}")
+                    return
+
+                if batch.status == "cancelled":
+                    logger.info(f"배치 취소됨: {batch_id}")
+                    return
+
                 logger.info(
                     f"[{idx + 1}/{len(keywords)}] 키워드 수집 시작: '{keyword.keyword}'"
                 )
@@ -104,7 +121,15 @@ class BatchCollectionService:
                 # Rate Limiting: 1분 대기 (마지막 키워드는 제외)
                 if idx < len(keywords) - 1:
                     logger.info("다음 키워드까지 60초 대기...")
-                    await asyncio.sleep(60)
+                    # 1초씩 체크하면서 대기 (일시정지/취소 즉시 반응)
+                    for _ in range(60):
+                        batch = await BatchCollection.find_one(
+                            BatchCollection.batch_id == batch_id
+                        )
+                        if batch.status in ["paused", "cancelled"]:
+                            logger.info(f"대기 중 배치 상태 변경: {batch.status}")
+                            return
+                        await asyncio.sleep(1)
 
             # 배치 완료
             batch.status = "completed"
@@ -128,6 +153,7 @@ class BatchCollectionService:
 
         finally:
             self.is_running = False
+            self.current_batch_id = None
 
     async def _check_duplicate(self, keyword: str) -> bool:
         """

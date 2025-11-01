@@ -41,8 +41,10 @@ class BatchCollection(Document):
     작업 상태
     - pending: 대기 중
     - running: 실행 중
+    - paused: 일시정지
     - completed: 완료
     - failed: 실패
+    - cancelled: 취소됨
     """
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
