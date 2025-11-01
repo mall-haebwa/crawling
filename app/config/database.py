@@ -56,12 +56,12 @@ class Database:
             logger.info(f"MongoDB 연결 시도: {settings.MONGODB_URL}")
 
             # Motor 비동기 클라이언트 생성
-            # 연결 풀 설정으로 성능 최적화
+            # 연결 풀 설정으로 성능 최적화 (환경 변수로 제어)
             cls.client = AsyncIOMotorClient(
                 settings.MONGODB_URL,
-                serverSelectionTimeoutMS=5000,  # 5초 타임아웃
-                maxPoolSize=100,  # 최대 100개 연결
-                minPoolSize=10,  # 최소 10개 연결 유지
+                serverSelectionTimeoutMS=settings.MONGODB_SERVER_SELECTION_TIMEOUT_MS,
+                maxPoolSize=settings.MONGODB_MAX_POOL_SIZE,
+                minPoolSize=settings.MONGODB_MIN_POOL_SIZE,
             )
 
             # 데이터베이스 선택

@@ -12,7 +12,11 @@ Pydantic Settings를 사용하여 환경 변수와 .env 파일에서
 """
 
 from pydantic_settings import BaseSettings
+from pydantic import field_validator, ValidationError
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -98,6 +102,73 @@ class Settings(BaseSettings):
 
     네이버 API 제한: 최대 100개
     """
+
+    # ==================== 데이터베이스 연결 풀 설정 ====================
+    MONGODB_MIN_POOL_SIZE: int = 10
+    """MongoDB 최소 연결 풀 크기 (기본값: 10)"""
+
+    MONGODB_MAX_POOL_SIZE: int = 100
+    """MongoDB 최대 연결 풀 크기 (기본값: 100)"""
+
+    MONGODB_SERVER_SELECTION_TIMEOUT_MS: int = 5000
+    """MongoDB 서버 선택 타임아웃 (밀리초, 기본값: 5000ms)"""
+
+    # ==================== HTTP 클라이언트 설정 ====================
+    HTTP_MAX_CONNECTIONS: int = 100
+    """HTTP 클라이언트 최대 연결 수 (기본값: 100)"""
+
+    HTTP_MAX_KEEPALIVE_CONNECTIONS: int = 20
+    """HTTP 클라이언트 최대 Keep-Alive 연결 수 (기본값: 20)"""
+
+    HTTP_TIMEOUT: float = 30.0
+    """HTTP 요청 타임아웃 (초, 기본값: 30.0)"""
+
+    # ==================== 환경 구분 ====================
+    ENVIRONMENT: str = "development"
+    """환경 구분 (development, staging, production)"""
+
+    @field_validator("API_RELOAD")
+    @classmethod
+    def validate_api_reload(cls, v: bool, info) -> bool:
+        """
+        운영 환경에서 API_RELOAD=True 경고
+        """
+        environment = info.data.get("ENVIRONMENT", "development")
+        if environment == "production" and v is True:
+            logger.warning(
+                "⚠️  경고: 운영 환경에서 API_RELOAD=True는 권장되지 않습니다. "
+                "성능 저하 및 메모리 누수가 발생할 수 있습니다."
+            )
+        return v
+
+    @field_validator("MONGODB_URL")
+    @classmethod
+    def validate_mongodb_url(cls, v: str) -> str:
+        """
+        MongoDB URL 보안 검증
+        """
+        if "0.0.0.0" in v or v.startswith("mongodb://localhost") is False:
+            # 공개 IP 사용 시 인증 필요
+            if "@" not in v:
+                logger.warning(
+                    "⚠️  보안 경고: MongoDB URL에 인증 정보가 없습니다. "
+                    "공개 네트워크에서는 반드시 인증을 사용하세요."
+                )
+        return v
+
+    @field_validator("API_HOST")
+    @classmethod
+    def validate_api_host(cls, v: str, info) -> str:
+        """
+        API 호스트 보안 검증
+        """
+        environment = info.data.get("ENVIRONMENT", "development")
+        if environment == "production" and v == "0.0.0.0":
+            logger.warning(
+                "⚠️  보안 경고: API_HOST=0.0.0.0은 모든 인터페이스에서 접근 가능합니다. "
+                "운영 환경에서는 특정 IP 또는 리버스 프록시 사용을 권장합니다."
+            )
+        return v
 
     class Config:
         """Pydantic 설정 클래스"""

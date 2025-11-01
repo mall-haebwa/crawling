@@ -94,7 +94,7 @@ class Product(Document):
     """세분류 카테고리 (예: 블루투스이어폰)"""
 
     # 상품 유형 및 상태
-    productId: Optional[str] = Field(None, description="네이버 상품 번호")
+    # 참고: productId는 product_id와 동일 (네이버 API 응답 구조 유지)
     productType: Optional[int] = Field(None, description="상품 타입 (1~12, 상품군과 상품 종류 조합)")
 
     # 상품 타입 상세 정보 (productType 기반 자동 계산)

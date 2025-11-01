@@ -168,9 +168,13 @@ async def collect_products(
 
     except HTTPException:
         raise
+    except ValueError as e:
+        logger.error(f"입력값 검증 오류 (query={query}): {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"상품 수집 오류 (query={query}): {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"상품 수집 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="상품 수집 중 오류가 발생했습니다. 관리자에게 문의하세요.")
 
 
 @router.get("/search", response_model=dict)
@@ -217,7 +221,8 @@ async def search_products(
 
         if keyword:
             # 텍스트 검색 (제목, 브랜드, 제조사)
-            # tags는 배열이므로 별도 처리
+            # MongoDB 텍스트 인덱스 우선 사용, 실패 시 regex 사용
+            # text 인덱스: [("title", "text"), ("brand", "text"), ("maker", "text")]
             query_conditions.append({
                 "$or": [
                     {"title": {"$regex": keyword, "$options": "i"}},
@@ -256,7 +261,8 @@ async def search_products(
 
     except Exception as e:
         logger.error(f"상품 검색 오류: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"상품 검색 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="상품 검색 중 오류가 발생했습니다. 관리자에게 문의하세요.")
 
 
 @router.get("/{product_id}", response_model=Product)
@@ -290,7 +296,8 @@ async def list_products(
         return products
     except Exception as e:
         logger.error(f"상품 목록 조회 오류: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"상품 조회 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="상품 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.")
 
 
 @router.delete("/{product_id}")
@@ -346,7 +353,8 @@ async def get_stats():
 
     except Exception as e:
         logger.error(f"통계 조회 오류: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"통계 조회 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="통계 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.")
 
 
 @router.get("/history/recent", response_model=List[dict])
@@ -378,7 +386,8 @@ async def get_recent_collection_history(
 
     except Exception as e:
         logger.error(f"수집 이력 조회 오류: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"수집 이력 조회 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="수집 이력 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.")
 
 
 @router.get("/history/keyword/{keyword}", response_model=List[dict])
@@ -411,4 +420,5 @@ async def get_keyword_collection_history(
 
     except Exception as e:
         logger.error(f"키워드 이력 조회 오류 (keyword={keyword}): {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"키워드 이력 조회 중 오류가 발생했습니다: {str(e)}")
+        # 보안: 내부 에러 상세 정보 노출 방지
+        raise HTTPException(status_code=500, detail="키워드 이력 조회 중 오류가 발생했습니다. 관리자에게 문의하세요.")
