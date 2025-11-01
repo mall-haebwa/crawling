@@ -21,6 +21,7 @@ from fastapi.templating import Jinja2Templates
 from contextlib import asynccontextmanager
 from app.config.database import db
 from app.routes import products_router
+from app.routes.batch import router as batch_router
 from app.config import settings
 from app.services.naver_api import naver_api
 import logging
@@ -173,8 +174,9 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 # Jinja2 템플릿 엔진 설정
 templates = Jinja2Templates(directory="templates")
 
-# 라우터 등록 (상품 관련 API 엔드포인트)
-app.include_router(products_router)
+# 라우터 등록
+app.include_router(products_router)  # 상품 관련 API
+app.include_router(batch_router)  # 일괄 수집 API
 
 
 @app.get("/", response_class=HTMLResponse, tags=["web"])
