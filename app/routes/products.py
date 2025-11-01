@@ -305,13 +305,16 @@ async def get_stats():
     try:
         total_products = await Product.count()
 
+        # Beanie 2.0에서는 aggregate를 직접 사용하지 않고 get_pymongo_collection()을 통해 접근
+        collection = Product.get_pymongo_collection()
+
         # 쇼핑몰별 집계
         pipeline = [
             {"$group": {"_id": "$mallName", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        mall_stats = await Product.aggregate(pipeline).to_list()
+        mall_stats = await collection.aggregate(pipeline).to_list(length=10)
 
         # 카테고리별 집계
         pipeline = [
@@ -319,7 +322,7 @@ async def get_stats():
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        category_stats = await Product.aggregate(pipeline).to_list()
+        category_stats = await collection.aggregate(pipeline).to_list(length=10)
 
         return {
             "total_products": total_products,
