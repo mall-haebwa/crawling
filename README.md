@@ -29,7 +29,9 @@ FastAPI + MongoDB 기반으로 구축되었으며, 자연어 기반 검색을 �
 
 ## 시스템 요구사항
 
-- Python 3.8+
+- Python 3.11+ (권장: 3.12.3)
+  - Python 3.11, 3.12, 3.13 완전 지원
+  - Python 3.14 실험적 지원
 - MongoDB 4.4+
 - Naver Open API 키 (Client ID, Client Secret)
 
@@ -573,6 +575,18 @@ pip install -r requirements.txt
 ## 라이선스
 
 MIT License
+
+## 주요 의존성 버전
+
+- **FastAPI** 0.120.4 (Python 3.14 지원)
+- **Pydantic** 2.12.3 (Python 3.13/3.14 지원)
+- **Beanie** 2.0.0 (MongoDB ODM)
+- **Motor** 3.7.1 (Async MongoDB Driver)
+- **PyMongo** 4.15.3
+- **httpx** 0.28.1
+- **Uvicorn** 0.38.0
+
+자세한 내용은 [PYTHON_313_COMPATIBILITY.md](./PYTHON_313_COMPATIBILITY.md)를 참고하세요.
 
 ## 참고 자료
 
