@@ -22,7 +22,8 @@ router = APIRouter(prefix="/batch", tags=["batch"])
 @router.post("/upload")
 async def upload_csv_batch(
     background_tasks: BackgroundTasks,
-    file: UploadFile = File(..., description="CSV 파일 (첫 번째 열에 키워드)")
+    file: UploadFile = File(..., description="CSV 파일 (첫 번째 열에 키워드)"),
+    rate_limit_seconds: int = 60
 ):
     """
     CSV 파일 업로드 및 일괄 수집 시작
@@ -89,10 +90,18 @@ async def upload_csv_batch(
 
         logger.info(f"CSV 파일 파싱 완료: {len(keywords)}개 키워드")
 
+        # Rate limit 검증
+        if rate_limit_seconds < 5 or rate_limit_seconds > 300:
+            raise HTTPException(
+                status_code=400,
+                detail="키워드 간격은 5초에서 300초 사이여야 합니다"
+            )
+
         # BatchCollection 생성
         batch = BatchCollection(
             csv_filename=file.filename,
-            total_keywords=len(keywords)
+            total_keywords=len(keywords),
+            rate_limit_seconds=rate_limit_seconds
         )
         await batch.insert()
 

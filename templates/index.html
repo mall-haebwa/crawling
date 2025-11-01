@@ -361,24 +361,20 @@
         <!-- 일괄 수집 섹션 -->
         <div class="search-section" style="border-top: 2px solid #e5e7eb; margin-top: 30px; padding-top: 30px;">
             <h2>📄 일괄 수집 (CSV 업로드)</h2>
-            <p style="color: #6b7280; margin-bottom: 20px;">키워드 목록 CSV 파일을 업로드하여 자동으로 수집합니다. (각 키워드당 1000개, 1분 간격)</p>
+            <p style="color: #6b7280; margin-bottom: 20px;">키워드 목록 CSV 파일을 업로드하여 자동으로 수집합니다. (각 키워드당 1000개)</p>
 
-            <div style="margin-bottom: 20px;">
+            <div style="margin-bottom: 20px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                 <input type="file" id="csv-file" accept=".csv" style="padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;">
-                <button onclick="uploadCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">업로드 & 수집 시작</button>
-                <a href="/static/keywords_sample.csv" download style="margin-left: 10px; color: #667eea;">샘플 CSV 다운로드</a>
-                <button onclick="loadBatchHistory()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer; margin-left: 10px;">이력 새로고침</button>
-            </div>
-
-            <!-- 배치 이력 -->
-            <div id="batch-history" style="margin-bottom: 20px; display: none;">
-                <h3 style="margin-bottom: 10px;">최근 배치 이력</h3>
-                <div id="batch-history-list" style="background: #f9fafb; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
-                    <div class="loading">이력 로딩 중...</div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <label for="rate-limit" style="color: #6b7280; font-size: 14px;">키워드 간격:</label>
+                    <input type="number" id="rate-limit" value="10" min="5" max="300" style="width: 70px; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                    <span style="color: #6b7280; font-size: 14px;">초</span>
                 </div>
+                <button onclick="uploadCSV()" style="padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer;">업로드 & 수집 시작</button>
+                <button onclick="loadBatchHistory()" style="padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">이력 새로고침</button>
             </div>
 
-            <div id="batch-status" style="display: none; padding: 20px; background: #f3f4f6; border-radius: 8px; margin-top: 20px;">
+            <div id="batch-status" style="display: none; padding: 20px; background: #f3f4f6; border-radius: 8px; margin-bottom: 20px;">
                 <h3 style="margin-bottom: 15px;">진행 현황</h3>
                 <div style="background: white; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
@@ -412,6 +408,14 @@
                     <button id="batch-resume-btn" onclick="resumeBatch()" style="display: none; padding: 10px 20px; background: #10b981; color: white; border: none; border-radius: 6px; cursor: pointer;">재개</button>
                     <button id="batch-cancel-btn" onclick="cancelBatch()" style="display: none; padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 6px; cursor: pointer;">취소</button>
                     <button id="batch-delete-btn" onclick="deleteBatch()" style="display: none; padding: 10px 20px; background: #6b7280; color: white; border: none; border-radius: 6px; cursor: pointer;">삭제</button>
+                </div>
+            </div>
+
+            <!-- 배치 이력 -->
+            <div id="batch-history" style="margin-bottom: 20px; display: none;">
+                <h3 style="margin-bottom: 10px;">최근 배치 이력</h3>
+                <div id="batch-history-list" style="background: #f9fafb; padding: 15px; border-radius: 8px; max-height: 300px; overflow-y: auto;">
+                    <div class="loading">이력 로딩 중...</div>
                 </div>
             </div>
         </div>
@@ -714,11 +718,17 @@
                 return;
             }
 
+            const rateLimitSeconds = parseInt(document.getElementById('rate-limit').value);
+            if (rateLimitSeconds < 5 || rateLimitSeconds > 300) {
+                alert('키워드 간격은 5초에서 300초 사이여야 합니다.');
+                return;
+            }
+
             const formData = new FormData();
             formData.append('file', file);
 
             try {
-                const response = await fetch('/batch/upload', {
+                const response = await fetch(`/batch/upload?rate_limit_seconds=${rateLimitSeconds}`, {
                     method: 'POST',
                     body: formData
                 });

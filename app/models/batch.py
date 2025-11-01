@@ -59,6 +59,9 @@ class BatchCollection(Document):
     current_keyword_index: int = 0
     """현재 처리 중인 키워드 인덱스 (0부터 시작)"""
 
+    rate_limit_seconds: int = 60
+    """키워드 간 대기 시간 (초 단위, 기본 60초)"""
+
     class Settings:
         name = "batch_collections"
         indexes = [

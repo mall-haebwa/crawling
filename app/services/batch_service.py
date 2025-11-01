@@ -118,11 +118,12 @@ class BatchCollectionService:
                     batch.current_keyword_index = idx + 1
                     await batch.save()
 
-                # Rate Limiting: 1분 대기 (마지막 키워드는 제외)
+                # Rate Limiting: 사용자 지정 시간 대기 (마지막 키워드는 제외)
                 if idx < len(keywords) - 1:
-                    logger.info("다음 키워드까지 60초 대기...")
+                    wait_seconds = batch.rate_limit_seconds
+                    logger.info(f"다음 키워드까지 {wait_seconds}초 대기...")
                     # 1초씩 체크하면서 대기 (일시정지/취소 즉시 반응)
-                    for _ in range(60):
+                    for _ in range(wait_seconds):
                         batch = await BatchCollection.find_one(
                             BatchCollection.batch_id == batch_id
                         )
