@@ -1,3 +1,17 @@
+"""
+상품 관련 API 라우터
+
+네이버 쇼핑 API를 통한 상품 수집, 검색, 조회, 통계 기능을 제공합니다.
+
+주요 엔드포인트:
+- POST /products/collect: 상품 수집
+- GET /products/search: 상품 검색
+- GET /products/{product_id}: 상품 상세 조회
+- DELETE /products/{product_id}: 상품 삭제
+- GET /products/stats/summary: 통계 조회
+- GET /products/history/recent: 수집 이력 조회
+"""
+
 from fastapi import APIRouter, HTTPException, Query
 from typing import List, Optional
 from app.models import Product, ProductSearchResponse
@@ -7,6 +21,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# 상품 관련 API 라우터
+# prefix: /products
+# tags: OpenAPI 문서에서 그룹화에 사용
 router = APIRouter(prefix="/products", tags=["products"])
 
 
@@ -22,12 +39,43 @@ async def collect_products(
     """
     네이버 쇼핑 API로 상품 검색 후 MongoDB에 저장
 
-    - **query**: 검색 키워드
-    - **max_results**: 수집할 최대 상품 수 (1~1000)
+    ## 주요 기능
+    - 네이버 쇼핑 API 호출하여 상품 데이터 수집
+    - 중복 수집 방지 (force=false 시)
+    - 신규 상품은 저장, 기존 상품은 가격 정보 업데이트
+    - 검색 이력 자동 저장
+
+    ## 파라미터
+    - **query** (필수): 검색 키워드 (예: "갤럭시 버즈")
+    - **max_results**: 수집할 최대 상품 수 (1~1000, 기본 100)
     - **sort**: 정렬 옵션
+        - sim: 정확도순 (기본값)
+        - date: 최신순
+        - asc: 가격 낮은 순
+        - dsc: 가격 높은 순
     - **filter**: 네이버페이 연동 상품만 검색 (naverpay)
-    - **exclude**: 제외할 상품 유형 (used:중고, rental:렌탈, cbshop:해외직구)
+    - **exclude**: 제외할 상품 유형 (콜론으로 구분)
+        - used: 중고 상품
+        - rental: 렌탈 상품
+        - cbshop: 해외직구/구매대행 상품
+        - 예: "used:rental:cbshop"
     - **force**: 중복 수집 강제 실행 (기본값: false)
+
+    ## 응답
+    - status: "success" 또는 "skipped"
+    - total_collected: 수집된 총 상품 수
+    - new_products: 신규 저장된 상품 수
+    - updated_products: 업데이트된 상품 수
+    - hint: force=true 사용 안내 (중복 수집 스킵 시)
+
+    ## 에러
+    - 404: 검색 결과가 없음
+    - 500: 서버 오류 또는 API 호출 실패
+
+    ## 사용 예시
+    ```
+    POST /products/collect?query=갤럭시 버즈&max_results=100&sort=sim
+    ```
     """
     try:
         # 중복 수집 방지: 이미 수집한 키워드인지 확인

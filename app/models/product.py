@@ -1,3 +1,16 @@
+"""
+상품 데이터 모델 정의
+
+Beanie ODM을 사용한 MongoDB 문서 모델입니다.
+네이버 쇼핑 API 응답 데이터를 저장하고 관리합니다.
+
+주요 기능:
+- Pydantic 기반 데이터 검증
+- MongoDB 인덱스 자동 생성
+- 타입 안정성 보장
+- 자동 타임스탬프 관리
+"""
+
 from datetime import datetime
 from typing import Optional, List
 from beanie import Document
@@ -7,29 +20,78 @@ from pydantic import Field, HttpUrl
 class Product(Document):
     """
     네이버 쇼핑 상품 정보 모델
-    자연어 검색 및 상세 분석을 위한 확장 필드 포함
+
+    네이버 쇼핑 검색 API의 응답 데이터를 확장하여
+    검색, 분석, 통계에 필요한 추가 필드를 포함합니다.
+
+    주요 특징:
+    - 기본 상품 정보 (제목, 가격, 이미지 등)
+    - 카테고리 정보 (최대 4단계)
+    - 상품 타입 분석 (중고/단종/판매예정)
+    - 가격 분석 (할인율, 가격 범위)
+    - 자동 태그 추출
+    - 검색 이력 추적
+
+    MongoDB 컬렉션: products
     """
 
-    # 기본 식별 정보
-    product_id: str = Field(..., description="상품 고유 ID")
+    # ==================== 기본 식별 정보 ====================
+    product_id: str = Field(..., description="상품 고유 ID (네이버 상품 번호)")
+    """
+    네이버 쇼핑 상품의 고유 식별자
+    중복 확인 및 업데이트 시 사용
+    """
+
     title: str = Field(..., description="상품명")
+    """
+    상품 제목 (HTML 태그 제거됨)
+    검색 키워드 강조를 위한 <b> 태그는 제거 후 저장
+    """
+
     link: HttpUrl = Field(..., description="상품 상세 페이지 URL")
+    """네이버 쇼핑 상품 상세 페이지 링크"""
+
     image: Optional[HttpUrl] = Field(None, description="상품 이미지 URL")
+    """
+    상품 대표 이미지 URL
+    썸네일 이미지로 사용 가능
+    """
 
-    # 가격 정보
-    lprice: int = Field(..., description="최저가")
-    hprice: Optional[int] = Field(None, description="최고가")
+    # ==================== 가격 정보 ====================
+    lprice: int = Field(..., description="최저가 (원)")
+    """상품의 최저 판매가격 (원 단위)"""
 
-    # 판매자 정보
+    hprice: Optional[int] = Field(None, description="최고가 (원)")
+    """
+    상품의 최고 판매가격 (원 단위)
+    가격비교 매칭 상품의 경우 제공됨
+    """
+
+    # ==================== 판매자 정보 ====================
     mallName: str = Field(..., description="쇼핑몰 이름")
-    maker: Optional[str] = Field(None, description="제조사")
-    brand: Optional[str] = Field(None, description="브랜드")
+    """
+    판매하는 쇼핑몰 이름
+    예: 네이버, 11번가, G마켓 등
+    """
 
-    # 카테고리 정보
-    category1: Optional[str] = Field(None, description="카테고리 1단계")
-    category2: Optional[str] = Field(None, description="카테고리 2단계")
-    category3: Optional[str] = Field(None, description="카테고리 3단계")
-    category4: Optional[str] = Field(None, description="카테고리 4단계")
+    maker: Optional[str] = Field(None, description="제조사")
+    """상품 제조사"""
+
+    brand: Optional[str] = Field(None, description="브랜드")
+    """상품 브랜드명"""
+
+    # ==================== 카테고리 정보 ====================
+    category1: Optional[str] = Field(None, description="카테고리 1단계 (대분류)")
+    """대분류 카테고리 (예: 디지털/가전)"""
+
+    category2: Optional[str] = Field(None, description="카테고리 2단계 (중분류)")
+    """중분류 카테고리 (예: 음향가전)"""
+
+    category3: Optional[str] = Field(None, description="카테고리 3단계 (소분류)")
+    """소분류 카테고리 (예: 이어폰/헤드폰)"""
+
+    category4: Optional[str] = Field(None, description="카테고리 4단계 (세분류)")
+    """세분류 카테고리 (예: 블루투스이어폰)"""
 
     # 상품 유형 및 상태
     productId: Optional[str] = Field(None, description="네이버 상품 번호")

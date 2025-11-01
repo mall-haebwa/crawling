@@ -38,7 +38,8 @@ FastAPI + MongoDB 기반으로 구축되었으며, 자연어 기반 검색을 �
 ### 1. 저장소 클론 및 이동
 
 ```bash
-cd crawlingTest
+git clone <repository-url>
+cd crawling
 ```
 
 ### 2. 가상환경 생성 및 활성화
@@ -267,7 +268,7 @@ curl -X DELETE "http://localhost:8000/products/12345678"
 ## 프로젝트 구조
 
 ```
-crawlingTest/
+crawling/
 ├── app/
 │   ├── __init__.py
 │   ├── config/
@@ -291,32 +292,137 @@ crawlingTest/
 └── README.md                 # 프로젝트 문서
 ```
 
-## 데이터 모델
+## 데이터 구조
 
-### Product (상품)
+### 📦 Product (상품 데이터)
 
-```python
+수집되는 상품 데이터는 다음과 같은 구조를 가집니다:
+
+#### 기본 필드 요약
+
+| 필드 | 타입 | 필수 | 설명 |
+|------|------|------|------|
+| `product_id` | string | ✅ | 상품 고유 ID (네이버 상품 번호) |
+| `title` | string | ✅ | 상품명 (HTML 태그 제거됨) |
+| `link` | string | ✅ | 상품 상세 페이지 URL |
+| `image` | string | ❌ | 상품 이미지 URL |
+| `lprice` | int | ✅ | 최저가 (원) |
+| `hprice` | int | ❌ | 최고가 (원) |
+| `mallName` | string | ✅ | 쇼핑몰 이름 |
+| `maker` | string | ❌ | 제조사 |
+| `brand` | string | ❌ | 브랜드 |
+| `category1~4` | string | ❌ | 카테고리 (4단계) |
+| `search_keyword` | string | ✅ | 검색 키워드 |
+| `tags` | array | ✅ | 자동 추출 태그 |
+| `rank` | int | ❌ | 검색 결과 내 순위 |
+
+<details>
+<summary><b>📋 전체 스키마 보기</b></summary>
+
+#### 기본 식별 정보
+```json
 {
-  "product_id": "12345678",           # 상품 고유 ID
-  "title": "삼성전자 갤럭시 버즈2",   # 상품명
-  "link": "https://...",              # 상품 URL
-  "image": "https://...",             # 이미지 URL
-  "lprice": 189000,                   # 최저가
-  "hprice": 229000,                   # 최고가
-  "mallName": "네이버",               # 쇼핑몰
-  "maker": "삼성전자",                # 제조사
-  "brand": "삼성",                    # 브랜드
-  "category1": "디지털/가전",         # 카테고리 1단계
-  "category2": "음향가전",            # 카테고리 2단계
-  "category3": "이어폰/헤드폰",       # 카테고리 3단계
-  "category4": "블루투스이어폰",      # 카테고리 4단계
-  "search_keyword": "갤럭시버즈",     # 검색 키워드
-  "tags": ["무선", "블루투스"],       # 자동 추출 태그
-  "rank": 1,                          # 검색 결과 순위
-  "created_at": "2025-10-31T...",     # 수집 시각
-  "updated_at": "2025-10-31T..."      # 갱신 시각
+  "product_id": "12345678",
+  "title": "삼성전자 갤럭시 버즈2 프로",
+  "link": "https://search.shopping.naver.com/gate.nhn?id=12345678",
+  "image": "https://shopping-phinf.pstatic.net/main_1234567/12345678.jpg"
 }
 ```
+
+#### 가격 정보
+```json
+{
+  "lprice": 189000,              // 최저가 (원)
+  "hprice": 229000,              // 최고가 (원, 선택)
+  "price_discount_rate": 17.47,  // 할인율 (%, 자동 계산)
+  "price_range": 40000           // 가격 범위 (원, 자동 계산)
+}
+```
+
+#### 판매자 정보
+```json
+{
+  "mallName": "네이버",
+  "maker": "삼성전자",
+  "brand": "삼성"
+}
+```
+
+#### 카테고리 정보 (최대 4단계)
+```json
+{
+  "category1": "디지털/가전",      // 대분류
+  "category2": "음향가전",         // 중분류
+  "category3": "이어폰/헤드폰",    // 소분류
+  "category4": "블루투스이어폰"    // 세분류
+}
+```
+
+#### 상품 타입 분석 (자동)
+```json
+{
+  "productType": 1,                    // 네이버 API 제공 (1~12)
+  "product_group": "일반상품",         // 일반/중고/단종/판매예정
+  "product_category_type": "가격비교상품",  // 가격비교/비매칭/매칭
+  "is_used": false,                    // 중고 여부
+  "is_discontinued": false,            // 단종 여부
+  "is_presale": false                  // 판매예정 여부
+}
+```
+
+#### 검색 및 분석
+```json
+{
+  "search_keyword": "갤럭시 버즈",
+  "tags": ["삼성", "갤럭시", "버즈2", "프로", "무선", "블루투스"],
+  "rank": 1
+}
+```
+
+#### 메타데이터
+```json
+{
+  "created_at": "2025-10-31T04:00:00.000Z",  // 최초 수집 시각
+  "updated_at": "2025-10-31T08:00:00.000Z",  // 최근 갱신 시각
+  "last_build_date": "2025-10-31T03:55:00.000Z"  // API 응답 생성 시각
+}
+```
+
+</details>
+
+### 📊 ProductSearchResponse (검색 이력)
+
+```json
+{
+  "search_keyword": "갤럭시 버즈",     // 검색 키워드
+  "total_count": 100,                 // 수집된 상품 수
+  "display": 100,                     // 한 번에 표시된 결과 수
+  "start": 1,                         // 검색 시작 위치
+  "sort": "sim",                      // 정렬 옵션 (sim/date/asc/dsc)
+  "collected_at": "2025-10-31T..."    // 수집 시각
+}
+```
+
+### 💡 데이터 수집 특징
+
+#### 1. 자동 데이터 확장
+네이버 API 기본 응답에 다음 정보를 자동으로 추가합니다:
+- **가격 분석**: 할인율, 가격 범위 자동 계산
+- **태그 추출**: 제목, 브랜드, 제조사에서 키워드 자동 추출 (최대 20개)
+- **상품 타입 분석**: productType 값을 분석하여 중고/단종/판매예정 여부 자동 판별
+- **검색 순위**: 검색 결과 내 순위 자동 저장
+
+#### 2. MongoDB 인덱스
+검색 성능 최적화를 위해 다음 필드에 인덱스를 생성합니다:
+- `product_id` (고유 인덱스)
+- `title`, `search_keyword`, `mallName`, `brand`, `category1`
+- `created_at` (시계열 조회)
+- 텍스트 인덱스: `title`, `brand`, `maker` (전문 검색)
+
+#### 3. 데이터 갱신 정책
+- **신규 상품**: 전체 데이터 저장
+- **기존 상품**: `lprice`, `hprice`, `updated_at` 필드만 업데이트
+- **중복 확인**: `product_id` 기준
 
 ## 사용 예시
 
@@ -397,33 +503,76 @@ curl -X GET "http://localhost:8000/products/?limit=50&skip=50"
 ## 트러블슈팅
 
 ### MongoDB 연결 오류
-```
-pymongo.errors.ServerSelectionTimeoutError
-```
-**해결방법**: MongoDB가 실행 중인지 확인
+**증상**: `pymongo.errors.ServerSelectionTimeoutError`
+
+**해결방법**:
 ```bash
-sudo systemctl status mongodb
+# MongoDB 실행 상태 확인
+sudo systemctl status mongodb  # Linux
+brew services list  # macOS
+
+# MongoDB 재시작
+sudo systemctl restart mongodb  # Linux
+brew services restart mongodb-community  # macOS
 ```
 
 ### 네이버 API 오류
-```
-HTTP 401 Unauthorized
-```
-**해결방법**: `.env` 파일의 Client ID와 Secret 확인
+**증상**: `HTTP 401 Unauthorized`
 
-### 검색 결과 없음
+**해결방법**:
+1. `.env` 파일에 실제 API 키가 입력되었는지 확인
+2. 네이버 개발자 센터에서 API 키 재확인
+3. 서버 재시작
+
+### 포트 이미 사용 중
+**증상**: `Address already in use`
+
+**해결방법**:
+```bash
+# 포트 8000 사용 프로세스 확인 및 종료
+lsof -i :8000  # Linux/macOS
+kill -9 <PID>
 ```
-404: 검색 결과가 없습니다
+
+### 모듈을 찾을 수 없음
+**증상**: `ModuleNotFoundError`
+
+**해결방법**:
+```bash
+# 가상환경 활성화 확인
+source .venv/bin/activate  # Linux/Mac
+
+# 의존성 재설치
+pip install -r requirements.txt
 ```
-**해결방법**: 다른 키워드로 시도하거나 네이버 쇼핑에서 해당 키워드의 상품이 존재하는지 확인
+
+## 보안
+
+민감한 정보 관리 및 보안 가이드는 [SECURITY.md](SECURITY.md)를 참고하세요.
+
+**중요 사항**:
+- `.env` 파일을 절대 Git에 커밋하지 마세요
+- API 키가 노출되면 즉시 재발급하세요
+- MongoDB는 인증을 활성화하고 방화벽을 설정하세요
+
+## 기여하기
+
+### 코드 스타일
+- PEP 8 준수
+- Type hints 사용
+- Docstring 작성 (모든 함수/클래스)
+
+### Pull Request
+1. Fork 후 브랜치 생성
+2. 변경사항 커밋
+3. 테스트 실행
+4. PR 생성
+
+자세한 내용은 프로젝트 코드의 주석을 참고하세요.
 
 ## 라이선스
 
 MIT License
-
-## 기여
-
-이슈 및 PR은 언제나 환영합니다!
 
 ## 참고 자료
 
