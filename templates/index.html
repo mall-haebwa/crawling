@@ -688,6 +688,9 @@
         // ========== 일괄 수집 기능 ==========
         let currentBatchId = null;
         let batchWebSocket = null;
+        let pingIntervalId = null;  // ping interval ID 저장
+        let reconnectAttempts = 0;  // 재연결 시도 횟수
+        const MAX_RECONNECT_ATTEMPTS = 5;  // 최대 재연결 시도
 
         async function uploadCSV() {
             const fileInput = document.getElementById('csv-file');
@@ -741,6 +744,12 @@
                 batchWebSocket.close();
             }
 
+            // 기존 ping interval 정리 (메모리 누수 방지)
+            if (pingIntervalId) {
+                clearInterval(pingIntervalId);
+                pingIntervalId = null;
+            }
+
             // WebSocket 연결 (ws:// 또는 wss://)
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
             const wsUrl = `${protocol}//${window.location.host}/ws/batch/${batchId}`;
@@ -749,23 +758,45 @@
 
             batchWebSocket.onopen = () => {
                 console.log(`WebSocket 연결됨: ${batchId}`);
+                reconnectAttempts = 0;  // 연결 성공 시 재연결 카운터 초기화
             };
 
             batchWebSocket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                updateBatchStatusUI(data);
+                try {
+                    const data = JSON.parse(event.data);
+                    updateBatchStatusUI(data);
+                } catch (error) {
+                    console.error('WebSocket 메시지 파싱 실패:', error);
+                }
             };
 
             batchWebSocket.onerror = (error) => {
                 console.error('WebSocket 오류:', error);
             };
 
-            batchWebSocket.onclose = () => {
+            batchWebSocket.onclose = (event) => {
                 console.log('WebSocket 연결 종료');
+                // WebSocket 종료 시 ping interval도 정리
+                if (pingIntervalId) {
+                    clearInterval(pingIntervalId);
+                    pingIntervalId = null;
+                }
+
+                // 비정상 종료 시 재연결 시도 (코드 1000은 정상 종료)
+                if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);  // 지수 백오프 (최대 30초)
+                    console.log(`WebSocket 재연결 시도 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) - ${delay}ms 후`);
+                    setTimeout(() => {
+                        if (currentBatchId) {
+                            connectBatchWebSocket(currentBatchId);
+                        }
+                    }, delay);
+                }
             };
 
             // 연결 유지를 위한 ping (30초마다)
-            setInterval(() => {
+            pingIntervalId = setInterval(() => {
                 if (batchWebSocket && batchWebSocket.readyState === WebSocket.OPEN) {
                     batchWebSocket.send('ping');
                 }
@@ -837,6 +868,11 @@
                     if (batchWebSocket) {
                         batchWebSocket.close();
                         batchWebSocket = null;
+                    }
+                    // ping interval도 정리
+                    if (pingIntervalId) {
+                        clearInterval(pingIntervalId);
+                        pingIntervalId = null;
                     }
                     if (data.status === 'completed') {
                         alert(`배치 수집이 완료되었습니다!\n완료: ${progress.completed}개, 건너뜀: ${progress.skipped}개, 실패: ${progress.failed}개`);

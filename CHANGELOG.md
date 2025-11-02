@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.2] - 2025-11-02
+
+### 🔧 Critical Fixes
+- **🔴 setInterval 메모리 누수 수정** (templates/index.html:691-799)
+  - WebSocket 재연결 시마다 새로운 ping interval이 생성되던 치명적 버그 수정
+  - `pingIntervalId` 변수 추가로 interval 추적 및 정리
+  - 3곳에서 interval cleanup: 연결 시작 시, WebSocket 종료 시, 배치 완료 시
+  - 장시간 실행 시 메모리 누수 및 중복 ping 전송 방지
+
+- **WebSocket 자동 재연결 로직 추가** (templates/index.html:773-792)
+  - 비정상 종료 시 지수 백오프(exponential backoff)로 자동 재연결
+  - 재연결 간격: 2초 → 4초 → 8초 → 16초 → 32초 (최대 30초)
+  - 최대 5회 재연결 시도, 연결 성공 시 카운터 초기화
+  - 네트워크 불안정 환경에서 안정성 대폭 개선
+
+- **JSON.parse 에러 처리 추가** (templates/index.html:765-770)
+  - WebSocket 메시지 파싱 실패 시 try-catch로 안전하게 처리
+  - 잘못된 메시지 형식으로 인한 UI 크래시 방지
+
 ## [1.2.1] - 2025-11-02
 
 ### 🔧 Fixed
