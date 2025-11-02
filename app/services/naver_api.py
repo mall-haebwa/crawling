@@ -176,26 +176,36 @@ class NaverShoppingAPI:
         except httpx.HTTPStatusError as e:
             # HTTP 상태 코드별 처리
             status_code = e.response.status_code
-            error_detail = e.response.text
+            error_detail = e.response.text[:200]  # 긴 에러 메시지 제한
 
             if status_code == 400:
-                logger.error(f"잘못된 요청: {error_detail}")
+                logger.error(f"잘못된 요청 (query={query}): {error_detail}")
             elif status_code == 401:
-                logger.error(f"인증 실패: API 키를 확인하세요")
+                logger.error(f"인증 실패 (query={query}): API 키를 확인하세요")
+            elif status_code == 403:
+                logger.error(f"접근 거부 (query={query}): API 권한을 확인하세요")
             elif status_code == 429:
-                logger.warning(f"API 호출 한도 초과: 재시도 대기 중")
+                logger.warning(f"API 호출 한도 초과 (query={query}): 재시도 대기 중")
             elif status_code >= 500:
-                logger.error(f"서버 오류: {status_code} - {error_detail}")
+                logger.error(f"네이버 API 서버 오류 (query={query}): {status_code} - {error_detail}")
+            else:
+                logger.error(f"HTTP 오류 (query={query}): {status_code} - {error_detail}")
+            raise
 
-            logger.error(f"HTTP 오류 발생: {status_code} - {error_detail}")
+        except httpx.TimeoutException as e:
+            logger.error(f"네이버 API 타임아웃 (query={query}): {str(e)}")
+            raise
+
+        except httpx.ConnectError as e:
+            logger.error(f"네이버 API 연결 실패 (query={query}): {str(e)}")
             raise
 
         except httpx.RequestError as e:
-            logger.error(f"네트워크 요청 오류: {str(e)}")
+            logger.error(f"네트워크 요청 오류 (query={query}): {str(e)}")
             raise
 
         except Exception as e:
-            logger.error(f"예상치 못한 오류 발생: {str(e)}", exc_info=True)
+            logger.error(f"예상치 못한 오류 발생 (query={query}): {str(e)}", exc_info=True)
             raise
 
     async def search_and_collect(

@@ -147,13 +147,14 @@ class Settings(BaseSettings):
         """
         MongoDB URL 보안 검증
         """
-        if "0.0.0.0" in v or v.startswith("mongodb://localhost") is False:
-            # 공개 IP 사용 시 인증 필요
-            if "@" not in v:
-                logger.warning(
-                    "⚠️  보안 경고: MongoDB URL에 인증 정보가 없습니다. "
-                    "공개 네트워크에서는 반드시 인증을 사용하세요."
-                )
+        # localhost가 아닌 공개 IP/도메인 사용 시 인증 권장
+        is_localhost = v.startswith("mongodb://localhost") or v.startswith("mongodb://127.0.0.1")
+
+        if not is_localhost and "@" not in v:
+            logger.warning(
+                "⚠️  보안 경고: MongoDB URL에 인증 정보가 없습니다. "
+                "공개 네트워크에서는 반드시 인증을 사용하세요."
+            )
         return v
 
     @field_validator("API_HOST")

@@ -12,9 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["websocket"])
 
-# 배치별 연결된 클라이언트 관리
-batch_connections: dict[str, Set[WebSocket]] = {}
-
 
 class ConnectionManager:
     """WebSocket 연결 관리자"""

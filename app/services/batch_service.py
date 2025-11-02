@@ -15,12 +15,13 @@ from app.services.naver_api import naver_api
 logger = logging.getLogger(__name__)
 
 
-async def broadcast_batch_status(batch_id: str):
+async def broadcast_batch_status(batch_id: str, current_keyword_obj=None):
     """
     배치 상태를 WebSocket으로 브로드캐스트
 
     Args:
         batch_id: 배치 ID
+        current_keyword_obj: 현재 키워드 객체 (선택사항, 성능 최적화)
     """
     try:
         # 순환 import 방지를 위해 함수 내부에서 import
@@ -33,20 +34,31 @@ async def broadcast_batch_status(batch_id: str):
         if not batch:
             return
 
-        # 키워드 목록 조회
-        keywords = await BatchKeyword.find(
-            BatchKeyword.batch_id == batch_id
-        ).sort("order").to_list()
+        # 현재 키워드 정보 (전달받은 객체 우선 사용)
+        current_keyword = current_keyword_obj
+        if current_keyword is None and batch.current_keyword_index >= 0:
+            # 필요한 경우에만 현재 키워드만 조회 (전체 목록 조회 대신)
+            current_keyword = await BatchKeyword.find_one(
+                BatchKeyword.batch_id == batch_id,
+                BatchKeyword.order == batch.current_keyword_index
+            )
 
-        # 현재 키워드
-        current_keyword = None
-        if batch.current_keyword_index < len(keywords):
-            current_keyword = keywords[batch.current_keyword_index]
+        # 통계 계산 - Aggregation으로 최적화 (한 번의 쿼리로 집계)
+        collection = BatchKeyword.get_pymongo_collection()
+        pipeline = [
+            {"$match": {"batch_id": batch_id}},
+            {"$group": {
+                "_id": None,
+                "total_products": {"$sum": "$total_collected"},
+                "new_products": {"$sum": "$new_products"},
+                "updated_products": {"$sum": "$updated_products"}
+            }}
+        ]
+        stats_result = await collection.aggregate(pipeline).to_list(length=1)
 
-        # 통계 계산
-        total_products = sum(k.total_collected for k in keywords)
-        new_products = sum(k.new_products for k in keywords)
-        updated_products = sum(k.updated_products for k in keywords)
+        total_products = stats_result[0]["total_products"] if stats_result else 0
+        new_products = stats_result[0]["new_products"] if stats_result else 0
+        updated_products = stats_result[0]["updated_products"] if stats_result else 0
 
         # 진행률 계산
         percentage = 0
@@ -92,7 +104,7 @@ class BatchCollectionService:
         self.is_running = False
         """현재 배치 작업 실행 중 여부 (동시 실행 방지)"""
 
-        self.current_batch_id: str | None = None
+        self.current_batch_id: Optional[str] = None
         """현재 실행 중인 배치 ID"""
 
         self._lock = asyncio.Lock()
@@ -155,12 +167,12 @@ class BatchCollectionService:
                 )
                 if batch.status == "paused":
                     logger.info(f"배치 일시정지됨: {batch_id}")
-                    await broadcast_batch_status(batch_id)
+                    await broadcast_batch_status(batch_id, keyword)
                     return
 
                 if batch.status == "cancelled":
                     logger.info(f"배치 취소됨: {batch_id}")
-                    await broadcast_batch_status(batch_id)
+                    await broadcast_batch_status(batch_id, keyword)
                     return
 
                 logger.info(
@@ -179,10 +191,24 @@ class BatchCollectionService:
                     batch.current_keyword_index = idx + 1
                     await batch.save()
 
-                    # WebSocket 브로드캐스트
-                    await broadcast_batch_status(batch_id)
+                    # WebSocket 브로드캐스트 (현재 키워드 객체 전달)
+                    await broadcast_batch_status(batch_id, keyword)
 
                     logger.info(f"중복 키워드 건너뜀: '{keyword.keyword}'")
+
+                    # Rate Limiting: 중복 키워드도 대기 시간 적용 (마지막 키워드 제외)
+                    if idx < len(keywords) - 1:
+                        wait_seconds = batch.rate_limit_seconds
+                        logger.debug(f"중복 키워드 후 {wait_seconds}초 대기...")
+                        for _ in range(wait_seconds):
+                            batch_check = await BatchCollection.find_one(
+                                BatchCollection.batch_id == batch_id
+                            )
+                            if batch_check and batch_check.status in ["paused", "cancelled"]:
+                                logger.info(f"대기 중 배치 상태 변경: {batch_check.status}")
+                                return
+                            await asyncio.sleep(1)
+
                     continue
 
                 # 수집 실행
@@ -197,8 +223,8 @@ class BatchCollectionService:
                     batch.current_keyword_index = idx + 1
                     await batch.save()
 
-                    # WebSocket 브로드캐스트
-                    await broadcast_batch_status(batch_id)
+                    # WebSocket 브로드캐스트 (현재 키워드 객체 전달)
+                    await broadcast_batch_status(batch_id, keyword)
 
                 except Exception as e:
                     logger.error(f"키워드 수집 실패: '{keyword.keyword}' - {e}")
@@ -211,8 +237,8 @@ class BatchCollectionService:
                     batch.current_keyword_index = idx + 1
                     await batch.save()
 
-                    # WebSocket 브로드캐스트
-                    await broadcast_batch_status(batch_id)
+                    # WebSocket 브로드캐스트 (현재 키워드 객체 전달)
+                    await broadcast_batch_status(batch_id, keyword)
 
                 # Rate Limiting: 사용자 지정 시간 대기 (마지막 키워드는 제외)
                 if idx < len(keywords) - 1:
