@@ -423,6 +423,91 @@
     </div>
 
     <script>
+        // ========== 보안 유틸리티 ==========
+        /**
+         * HTML 이스케이프 - XSS 방지
+         */
+        function escapeHtml(unsafe) {
+            if (unsafe === null || unsafe === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = String(unsafe);
+            return div.innerHTML;
+        }
+
+        /**
+         * URL 안전성 검증 - javascript: 프로토콜 등 차단
+         */
+        function sanitizeUrl(url) {
+            if (!url) return '#';
+
+            const dangerous = /^(javascript|data|vbscript):/i;
+            if (dangerous.test(url)) {
+                console.warn('Dangerous URL blocked:', url);
+                return '#';
+            }
+
+            try {
+                const parsed = new URL(url);
+                if (!['http:', 'https:'].includes(parsed.protocol)) {
+                    return '#';
+                }
+                return url;
+            } catch {
+                return '#';
+            }
+        }
+
+        /**
+         * 이미지 URL 안전성 검증
+         */
+        function sanitizeImageUrl(url) {
+            if (!url) return '/static/no-image.svg';
+
+            const dangerous = /^(javascript|data|vbscript):/i;
+            if (dangerous.test(url)) {
+                console.warn('Dangerous image URL blocked:', url);
+                return '/static/no-image.svg';
+            }
+
+            try {
+                const parsed = new URL(url);
+                if (!['http:', 'https:'].includes(parsed.protocol)) {
+                    return '/static/no-image.svg';
+                }
+                return url;
+            } catch {
+                return '/static/no-image.svg';
+            }
+        }
+
+        /**
+         * API 에러 처리 유틸리티
+         */
+        function handleApiError(error, context) {
+            console.error(`${context}:`, error);
+            showError('작업을 완료할 수 없습니다. 잠시 후 다시 시도해주세요.');
+        }
+
+        /**
+         * 사용자 친화적 에러 메시지 표시
+         */
+        function showError(message) {
+            const messageDiv = document.getElementById('collect-message') ||
+                              document.querySelector('.search-section');
+            if (messageDiv) {
+                messageDiv.innerHTML = `
+                    <div class="error" role="alert" style="padding: 10px; margin: 10px 0; background: #fee; color: #c00; border-radius: 6px;">
+                        ${escapeHtml(message)}
+                    </div>
+                `;
+
+                setTimeout(() => {
+                    messageDiv.innerHTML = '';
+                }, 5000);
+            }
+        }
+
+        // ========== 전역 변수 ==========
         let currentPage = 1;
         const pageSize = 12;
         let currentSearchParams = null; // 현재 검색 조건 저장
@@ -434,6 +519,24 @@
             loadCollectionHistory();
             loadBatchHistory();
         };
+
+        // 페이지 언로드 시 WebSocket 정리
+        window.addEventListener('beforeunload', () => {
+            cleanupWebSocket();
+        });
+
+        function cleanupWebSocket() {
+            if (pingIntervalId) {
+                clearInterval(pingIntervalId);
+                pingIntervalId = null;
+            }
+
+            if (batchWebSocket) {
+                batchWebSocket.onclose = null; // 재연결 방지
+                batchWebSocket.close();
+                batchWebSocket = null;
+            }
+        }
 
         // 통계 로드
         async function loadStats() {
@@ -479,13 +582,13 @@
                         'date': '날짜',
                         'asc': '가격↑',
                         'dsc': '가격↓'
-                    }[item.sort] || item.sort;
+                    }[item.sort] || escapeHtml(item.sort);
 
                     return `
                         <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; border-left: 4px solid #f59e0b;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-weight: 500; color: #92400e;">${item.keyword}</div>
+                                    <div style="font-weight: 500; color: #92400e;">${escapeHtml(item.keyword)}</div>
                                     <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
                                         ${item.total_count.toLocaleString()}개 · ${sortLabel} · ${dateStr}
                                     </div>
@@ -638,21 +741,21 @@
 
             grid.innerHTML = products.map(product => `
                 <div class="product-card">
-                    <img src="${product.image || '/static/no-image.svg'}"
-                         alt="${product.title}"
+                    <img src="${sanitizeImageUrl(product.image)}"
+                         alt="${escapeHtml(product.title)}"
                          class="product-image"
                          onerror="this.src='/static/no-image.svg'">
                     <div class="product-info">
-                        <div class="product-title">${product.title}</div>
+                        <div class="product-title">${escapeHtml(product.title)}</div>
                         <div class="product-price">${product.lprice.toLocaleString()}원</div>
-                        <div class="product-meta">쇼핑몰: ${product.mallName}</div>
-                        ${product.brand ? `<div class="product-meta">브랜드: ${product.brand}</div>` : ''}
-                        ${product.category1 ? `<div class="product-meta">카테고리: ${product.category1}</div>` : ''}
+                        <div class="product-meta">쇼핑몰: ${escapeHtml(product.mallName)}</div>
+                        ${product.brand ? `<div class="product-meta">브랜드: ${escapeHtml(product.brand)}</div>` : ''}
+                        ${product.category1 ? `<div class="product-meta">카테고리: ${escapeHtml(product.category1)}</div>` : ''}
                         <div class="product-tags">
-                            ${(product.tags || []).slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join('')}
+                            ${(product.tags || []).slice(0, 3).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
                         </div>
                     </div>
-                    <a href="${product.link}" target="_blank" class="product-link">상품 보기 →</a>
+                    <a href="${sanitizeUrl(product.link)}" target="_blank" rel="noopener noreferrer" class="product-link">상품 보기 →</a>
                 </div>
             `).join('');
         }
@@ -690,6 +793,7 @@
         let batchWebSocket = null;
         let pingIntervalId = null;  // ping interval ID 저장
         let reconnectAttempts = 0;  // 재연결 시도 횟수
+        let isReconnecting = false;  // 재연결 중 플래그 (race condition 방지)
         const MAX_RECONNECT_ATTEMPTS = 5;  // 최대 재연결 시도
 
         async function uploadCSV() {
@@ -697,13 +801,36 @@
             const file = fileInput.files[0];
 
             if (!file) {
-                alert('CSV 파일을 선택해주세요.');
+                showError('CSV 파일을 선택해주세요.');
                 return;
             }
 
-            const rateLimitSeconds = parseInt(document.getElementById('rate-limit').value);
-            if (rateLimitSeconds < 5 || rateLimitSeconds > 300) {
-                alert('키워드 간격은 5초에서 300초 사이여야 합니다.');
+            // 파일 타입 검증
+            const validExtensions = ['.csv'];
+            const fileName = file.name.toLowerCase();
+            const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext));
+
+            if (!hasValidExtension && !['text/csv', 'application/vnd.ms-excel', 'text/plain'].includes(file.type)) {
+                showError('CSV 파일만 업로드 가능합니다.');
+                fileInput.value = '';
+                return;
+            }
+
+            // 파일 크기 검증 (최대 5MB)
+            const maxSize = 5 * 1024 * 1024;
+            if (file.size > maxSize) {
+                showError('파일 크기는 5MB를 초과할 수 없습니다.');
+                fileInput.value = '';
+                return;
+            }
+
+            // Rate limit 검증
+            const rateLimitInput = document.getElementById('rate-limit');
+            const rateLimitSeconds = parseInt(rateLimitInput.value, 10);
+
+            if (isNaN(rateLimitSeconds) || rateLimitSeconds < 5 || rateLimitSeconds > 300) {
+                showError('키워드 간격은 5초에서 300초 사이의 숫자여야 합니다.');
+                rateLimitInput.focus();
                 return;
             }
 
@@ -731,10 +858,10 @@
                     // WebSocket 연결
                     connectBatchWebSocket(result.batch_id);
                 } else {
-                    alert(`업로드 실패: ${result.detail || '알 수 없는 오류'}`);
+                    showError(`업로드 실패: ${result.detail || '알 수 없는 오류'}`);
                 }
             } catch (error) {
-                alert(`업로드 중 오류 발생: ${error.message}`);
+                handleApiError(error, 'CSV 업로드');
             }
         }
 
@@ -759,11 +886,19 @@
             batchWebSocket.onopen = () => {
                 console.log(`WebSocket 연결됨: ${batchId}`);
                 reconnectAttempts = 0;  // 연결 성공 시 재연결 카운터 초기화
+                isReconnecting = false;  // 재연결 플래그 초기화
             };
 
             batchWebSocket.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
+
+                    // 데이터 구조 검증
+                    if (!data || !data.progress) {
+                        console.warn('Invalid WebSocket message structure:', data);
+                        return;
+                    }
+
                     updateBatchStatusUI(data);
                 } catch (error) {
                     console.error('WebSocket 메시지 파싱 실패:', error);
@@ -782,12 +917,19 @@
                     pingIntervalId = null;
                 }
 
-                // 비정상 종료 시 재연결 시도 (코드 1000은 정상 종료)
-                if (event.code !== 1000 && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                // 비정상 종료 시 재연결 시도 (race condition 방지)
+                if (event.code !== 1000 &&
+                    reconnectAttempts < MAX_RECONNECT_ATTEMPTS &&
+                    !isReconnecting &&
+                    currentBatchId) {
+
+                    isReconnecting = true;
                     reconnectAttempts++;
                     const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);  // 지수 백오프 (최대 30초)
                     console.log(`WebSocket 재연결 시도 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}) - ${delay}ms 후`);
+
                     setTimeout(() => {
+                        isReconnecting = false;
                         if (currentBatchId) {
                             connectBatchWebSocket(currentBatchId);
                         }
@@ -1034,13 +1176,14 @@
                     const date = new Date(batch.created_at);
                     const dateStr = date.toLocaleString('ko-KR');
                     const statusColor = statusColors[batch.status] || '#6b7280';
-                    const statusLabel = statusLabels[batch.status] || batch.status;
+                    const statusLabel = statusLabels[batch.status] || escapeHtml(batch.status);
+                    const safeBatchId = escapeHtml(batch.batch_id);
 
                     return `
-                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid ${statusColor};" onclick="viewBatchDetail('${batch.batch_id}')">
+                        <div style="background: white; padding: 12px; border-radius: 6px; margin-bottom: 8px; cursor: pointer; border-left: 4px solid ${statusColor};" data-batch-id="${safeBatchId}" onclick="viewBatchDetail('${safeBatchId}')">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
-                                    <div style="font-weight: 500;">${batch.csv_filename}</div>
+                                    <div style="font-weight: 500;">${escapeHtml(batch.csv_filename)}</div>
                                     <div style="font-size: 13px; color: #6b7280; margin-top: 4px;">
                                         ${batch.completed_keywords}/${batch.total_keywords} 완료 • ${dateStr}
                                     </div>

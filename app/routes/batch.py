@@ -61,6 +61,15 @@ async def upload_csv_batch(
 
         # 파일 읽기
         contents = await file.read()
+
+        # 파일 크기 검증 (최대 10MB)
+        MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(
+                status_code=413,
+                detail="파일 크기가 너무 큽니다 (최대 10MB)"
+            )
+
         decoded = contents.decode('utf-8-sig')  # BOM 처리
         csv_file = io.StringIO(decoded)
 
@@ -69,6 +78,8 @@ async def upload_csv_batch(
 
         # 키워드 추출
         keywords = []
+        MAX_KEYWORDS = 1000  # 최대 키워드 수 제한
+
         for row in reader:
             keyword = row.get('keyword', '').strip()
 
@@ -79,6 +90,20 @@ async def upload_csv_batch(
             # 주석 건너뛰기
             if keyword.startswith('#'):
                 continue
+
+            # 키워드 길이 검증 (최대 100자)
+            if len(keyword) > 100:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"키워드 길이는 100자 이하여야 합니다: {keyword[:50]}..."
+                )
+
+            # 키워드 수 제한 확인
+            if len(keywords) >= MAX_KEYWORDS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"키워드 수는 최대 {MAX_KEYWORDS}개까지 가능합니다"
+                )
 
             keywords.append(keyword)
 

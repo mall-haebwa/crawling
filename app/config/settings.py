@@ -127,6 +127,23 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
     """환경 구분 (development, staging, production)"""
 
+    # ==================== CORS 설정 ====================
+    ALLOWED_ORIGINS: str = "*"
+    """
+    CORS에서 허용할 출처 목록 (쉼표로 구분)
+
+    예시:
+        - "*": 모든 출처 허용 (개발 환경에만 사용)
+        - "http://localhost:3000,https://example.com": 특정 출처만 허용
+    """
+
+    @property
+    def cors_origins_list(self) -> list:
+        """CORS 허용 출처를 리스트로 반환"""
+        if self.ALLOWED_ORIGINS == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
+
     @field_validator("API_RELOAD")
     @classmethod
     def validate_api_reload(cls, v: bool, info) -> bool:

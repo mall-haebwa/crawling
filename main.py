@@ -18,6 +18,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.config.database import db
 from app.routes import products_router
@@ -168,11 +169,29 @@ app = FastAPI(
     }
 )
 
+# ==================== 미들웨어 설정 ====================
+
+# CORS 미들웨어 추가 (보안 강화)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins_list,  # 허용할 출처
+    allow_credentials=True,  # 쿠키 포함 요청 허용
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],  # 허용할 HTTP 메서드
+    allow_headers=["*"],  # 허용할 헤더
+    max_age=3600,  # Preflight 요청 캐시 시간 (초)
+)
+
+logger.info(f"CORS 설정: 허용된 출처 = {settings.cors_origins_list}")
+
+# ==================== 정적 파일 및 템플릿 ====================
+
 # 정적 파일 마운트 (CSS, JS, 이미지 등)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Jinja2 템플릿 엔진 설정
 templates = Jinja2Templates(directory="templates")
+
+# ==================== 라우터 등록 ====================
 
 # 라우터 등록
 app.include_router(products_router)  # 상품 관련 API

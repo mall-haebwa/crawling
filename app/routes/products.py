@@ -29,6 +29,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/products", tags=["products"])
 
 
+def sanitize_mongodb_input(value: str) -> str:
+    """
+    MongoDB operator injection 방어를 위한 입력 sanitization
+
+    $ 및 . 문자를 제거하여 MongoDB 쿼리 연산자 삽입 공격을 방지합니다.
+
+    Args:
+        value: 사용자 입력 문자열
+
+    Returns:
+        안전하게 처리된 문자열
+    """
+    if not value:
+        return value
+
+    # MongoDB 쿼리 연산자에 사용되는 특수 문자 제거
+    sanitized = value.replace("$", "").replace(".", "")
+
+    return sanitized
+
+
 @router.post("/collect", response_model=dict)
 async def collect_products(
     query: str = Query(..., description="검색 키워드"),
@@ -246,16 +267,18 @@ async def search_products(
             query_conditions.append({"category1": category1})
 
         if mall_name:
-            # NoSQL Injection 방지: 정규식 특수문자 이스케이프
-            escaped_mall = re.escape(mall_name)
+            # NoSQL Injection 방지: MongoDB 연산자 제거 + 정규식 특수문자 이스케이프
+            sanitized_mall = sanitize_mongodb_input(mall_name)
+            escaped_mall = re.escape(sanitized_mall)
             query_conditions.append({"mallName": {"$regex": escaped_mall, "$options": "i"}})
 
         if keyword:
             # 텍스트 검색 (제목, 브랜드, 제조사)
             # MongoDB 텍스트 인덱스 우선 사용, 실패 시 regex 사용
             # text 인덱스: [("title", "text"), ("brand", "text"), ("maker", "text")]
-            # NoSQL Injection 방지: 정규식 특수문자 이스케이프
-            escaped_keyword = re.escape(keyword)
+            # NoSQL Injection 방지: MongoDB 연산자 제거 + 정규식 특수문자 이스케이프
+            sanitized_keyword = sanitize_mongodb_input(keyword)
+            escaped_keyword = re.escape(sanitized_keyword)
             query_conditions.append({
                 "$or": [
                     {"title": {"$regex": escaped_keyword, "$options": "i"}},

@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-11-02
+
+### 🔒 보안 강화 (Security Enhancements)
+
+#### Critical Issues Fixed
+- **🔴 XSS 취약점 전면 수정** (templates/index.html)
+  - HTML 이스케이프 함수 추가 (`escapeHtml`)
+  - URL/이미지 안전성 검증 (`sanitizeUrl`, `sanitizeImageUrl`)
+  - javascript: 프로토콜 및 data: URI 차단
+  - 상품명, 키워드, 파일명 등 모든 사용자 입력 sanitization
+  - `rel="noopener noreferrer"` 추가 (reverse tabnabbing 방지)
+
+- **🔴 CORS 설정 추가** (main.py, settings.py)
+  - CORSMiddleware 추가로 CSRF 공격 방어
+  - 허용 출처 환경변수로 관리 (`ALLOWED_ORIGINS`)
+  - 허용 메서드/헤더 명시적 설정
+  - Preflight 요청 캐싱 (1시간)
+
+#### High-Severity Issues Fixed
+- **🟠 NoSQL Injection 방어** (app/routes/products.py)
+  - `sanitize_mongodb_input()` 함수 추가
+  - MongoDB 연산자 문자 ($, .) 제거
+  - 검색 쿼리 이중 검증 (sanitize + re.escape)
+
+- **🟠 CSV 업로드 검증 강화**
+  - 프론트엔드: 파일 타입/크기(5MB) 검증
+  - 백엔드: 크기(10MB)/키워드수(1000개)/길이(100자) 제한
+  - 상세한 검증 에러 메시지
+
+- **🟠 WebSocket 메모리 누수 수정**
+  - `cleanupWebSocket()` 함수 추가
+  - beforeunload 이벤트 핸들러 등록
+  - 페이지 이동 시 자동 정리
+
+- **🟠 WebSocket Race Condition 수정**
+  - `isReconnecting` 플래그 추가
+  - 중복 재연결 시도 방지
+  - 데이터 구조 검증 추가
+
+- **🟠 에러 처리 개선**
+  - `handleApiError()`, `showError()` 유틸리티
+  - 사용자 친화적 메시지 (내부 정보 노출 방지)
+  - JSON.parse 실패 안전 처리
+
+### ✨ 개선사항
+- 보안 유틸리티 함수 문서화
+- 일관된 에러 처리 패턴
+- 에러 메시지 자동 숨김 (5초)
+
 ## [1.2.2] - 2025-11-02
 
 ### 🔧 Critical Fixes
