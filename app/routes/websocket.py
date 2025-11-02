@@ -5,6 +5,7 @@ WebSocket 라우터
 """
 
 import logging
+import asyncio
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from typing import Set
 
@@ -76,18 +77,39 @@ async def batch_websocket(websocket: WebSocket, batch_id: str):
         batch_id: 배치 ID
 
     연결되면 배치 상태 변경 시 실시간으로 데이터 전송
+
+    Features:
+        - 5분 idle timeout (클라이언트 활동 없으면 자동 종료)
+        - Ping/Pong 지원
+        - 자동 연결 정리
     """
     await manager.connect(websocket, batch_id)
     try:
         # 연결 유지 (클라이언트가 연결 해제할 때까지)
+        # 5분 idle timeout 적용 (리소스 누수 방지)
+        IDLE_TIMEOUT = 300.0  # 5분 (초 단위)
+
         while True:
-            # 클라이언트로부터 메시지 수신 (ping/pong 등)
-            data = await websocket.receive_text()
-            if data == "ping":
-                await websocket.send_text("pong")
+            try:
+                # 클라이언트로부터 메시지 수신 (타임아웃 적용)
+                data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=IDLE_TIMEOUT
+                )
+
+                # Ping/Pong 처리
+                if data == "ping":
+                    await websocket.send_text("pong")
+
+            except asyncio.TimeoutError:
+                # Idle timeout - 연결 종료
+                logger.info(f"WebSocket idle timeout ({IDLE_TIMEOUT}초): batch_id={batch_id}")
+                await websocket.close(code=1000, reason="Idle timeout")
+                break
+
     except WebSocketDisconnect:
         manager.disconnect(websocket, batch_id)
         logger.info(f"클라이언트 연결 해제: batch_id={batch_id}")
     except Exception as e:
-        logger.error(f"WebSocket 오류: {e}")
+        logger.error(f"WebSocket 오류: {e}", exc_info=True)
         manager.disconnect(websocket, batch_id)

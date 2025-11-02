@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-11-02
+
+### 🟡 Medium Severity Improvements
+
+#### 성능 최적화
+- **복합 인덱스 추가** (app/models/product.py)
+  - 카테고리+가격, 쇼핑몰+날짜, 키워드+날짜, 가격범위, 복합필터
+  - 쿼리 성능 대폭 개선
+
+#### 안정성 개선
+- **WebSocket idle timeout** (5분 무응답 시 자동 종료)
+- **MongoDB 연결 정리 강화** (try-except-finally)
+
+#### UX 개선
+- **모바일 반응형** (768px/480px breakpoint)
+- **접근성 ARIA** (role, aria-label, aria-expanded)
+- **로딩 상태 UI** (버튼 비활성화, 복원 보장)
+
 ## [1.3.0] - 2025-11-02
 
 ### 🔒 보안 강화 (Security Enhancements)

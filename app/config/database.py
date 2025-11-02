@@ -87,10 +87,16 @@ class Database:
 
         except Exception as e:
             logger.error(f"MongoDB 연결 실패: {str(e)}", exc_info=True)
-            # 연결 실패 시 클라이언트 정리
+            # 연결 실패 시 클라이언트 정리 (안전한 정리)
             if cls.client:
-                cls.client.close()
-                cls.client = None
+                try:
+                    cls.client.close()
+                    logger.info("MongoDB 클라이언트 정리 완료")
+                except Exception as close_error:
+                    logger.error(f"MongoDB 클라이언트 종료 실패: {close_error}", exc_info=True)
+                finally:
+                    cls.client = None
+                    cls.database = None
             raise
 
     @classmethod

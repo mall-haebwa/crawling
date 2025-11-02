@@ -123,6 +123,7 @@ class Product(Document):
     class Settings:
         name = "products"
         indexes = [
+            # 단일 필드 인덱스
             "product_id",
             "title",
             "search_keyword",
@@ -130,7 +131,16 @@ class Product(Document):
             "brand",
             "category1",
             "created_at",
-            [("title", "text"), ("brand", "text"), ("maker", "text")],  # 텍스트 검색 인덱스
+
+            # 텍스트 검색 인덱스
+            [("title", "text"), ("brand", "text"), ("maker", "text")],
+
+            # 복합 인덱스 (성능 최적화)
+            [("category1", 1), ("lprice", 1)],  # 카테고리별 가격 필터링
+            [("mallName", 1), ("created_at", -1)],  # 쇼핑몰별 최신순 정렬
+            [("search_keyword", 1), ("created_at", -1)],  # 키워드별 수집 이력
+            [("lprice", 1), ("hprice", 1)],  # 가격 범위 쿼리
+            [("category1", 1), ("mallName", 1), ("lprice", 1)],  # 카테고리+쇼핑몰+가격
         ]
 
     class Config:
