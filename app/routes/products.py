@@ -230,6 +230,7 @@ async def collect_products(
 @router.get("/search", response_model=dict)
 async def search_products(
     keyword: Optional[str] = Query(None, description="검색 키워드 (제목, 브랜드, 제조사)"),
+    product_id: Optional[str] = Query(None, description="상품 ID로 검색"),
     category1: Optional[str] = Query(None, description="카테고리 1단계"),
     mall_name: Optional[str] = Query(None, description="쇼핑몰 이름"),
     min_price: Optional[int] = Query(None, ge=0, description="최소 가격"),
@@ -244,6 +245,7 @@ async def search_products(
 
     ## 파라미터
     - **keyword**: 제목, 브랜드, 제조사에서 검색
+    - **product_id**: 상품 ID로 검색
     - **category1**: 카테고리 필터 (인덱스 활용)
     - **mall_name**: 쇼핑몰 필터 (인덱스 활용)
     - **min_price**: 최소 가격
@@ -261,6 +263,11 @@ async def search_products(
     try:
         # 쿼리 빌더 - 인덱스 활용을 위해 순서 최적화
         query_conditions = []
+
+        # 상품 ID 검색 (우선순위 최상위)
+        if product_id:
+            sanitized_id = sanitize_mongodb_input(product_id)
+            query_conditions.append({"product_id": sanitized_id})
 
         # 인덱스가 있는 필드 우선 처리
         if category1:
