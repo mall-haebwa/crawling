@@ -1312,15 +1312,16 @@
             // 스크롤 이동
             document.getElementById('batch-status').scrollIntoView({ behavior: 'smooth' });
 
-            // 상태 업데이트
-            await updateBatchStatus();
-
-            // 상태가 running이면 폴링 시작
+            // 상태 가져오기
             const response = await fetch(`/batch/${batchId}/status`);
             const data = await response.json();
 
+            // UI 업데이트
+            updateBatchStatusUI(data);
+
+            // 상태가 running이면 WebSocket 연결
             if (data.status === 'running') {
-                startBatchStatusPolling();
+                connectBatchWebSocket(batchId);
             }
         }
     </script>
